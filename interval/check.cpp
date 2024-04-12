@@ -412,13 +412,17 @@ void analyzeBinaryMethod(int E, int M, const char* title, const itv::interval& D
                           << "(c) >= " << Zm << "(m)"
                           << "\t (precision " << precision << "), \t LSB diff = " << Zm.lsb() - Zc.lsb() << "\033[0m"
                           << std::endl;
+            } else if (Zc >= Zm) {
+                std::cout << "\033[33m"
+                          << "WARNING " << e << ": " << title << "(" << X << ",\t" << Y << ")\n =c=> " << Zc
+                          << "(c) >= " << Zm << "(m)"
+                          << "\t LSB diff = " << Zm.lsb() - Zc.lsb() << "\033[0m" << std::endl;
             } else {
                 std::cout << "\033[31m"
-                          << "ERROR " << e << ": " << title << "(" << X << ",\t" << Y << ")\n =c=> " << Zc
-                          << "(c) != " << Zm << "(m)"
+                          << "ERROR " << e << ": " << title << "(" << X << ",\t" << Y << ")\n =c=> " << Zc << "(c) < "
+                          << Zm << "(m)"
                           << "\t LSB diff = " << Zm.lsb() - Zc.lsb() << "\033[0m" << std::endl;
             }
-
         } else {  // integer operation
             // std::cout << "Testing integer version of " << title << std::endl;
             // X: random input interval X < Dx
@@ -500,10 +504,17 @@ void analyzeBinaryMethod(int E, int M, const char* title, const itv::interval& D
                           << "(c) >= " << Zm << "(m)"
                           << "\t (precision " << precision << "), \t LSB diff = " << Zm.lsb() - Zc.lsb() << "\033[0m"
                           << std::endl;
+            } else if (Zc >= Zm) {
+                std::string color = "\033[33m";
+
+                std::cout << color << "WARNING    " << e << ": " << title << "(" << X << ",\t" << Y << ")\n =c=> " << Zc
+                          << "(c) >= " << Zm << "(m)"
+                          << "\t (precision " << precision << "), \t LSB diff = " << Zm.lsb() - Zc.lsb() << "\033[0m"
+                          << std::endl;
             } else {
                 std::cout << "\033[31m"
-                          << "ERROR " << e << ": " << title << "(" << X << ",\t" << Y << ")\n =c=> " << Zc
-                          << "(c) != " << Zm << "(m)"
+                          << "ERROR " << e << ": " << title << "(" << X << ",\t" << Y << ")\n =c=> " << Zc << "(c) < "
+                          << Zm << "(m)"
                           << "\t LSB diff = " << Zm.lsb() - Zc.lsb() << "\033[0m" << std::endl;
             }
         }
