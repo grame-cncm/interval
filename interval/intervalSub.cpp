@@ -32,7 +32,7 @@ static double sub(double a, double b)
 interval interval_algebra::Sub(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
 
     return {x.lo() - y.hi(), x.hi() - y.lo(), std::min(x.lsb(), y.lsb())};

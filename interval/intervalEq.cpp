@@ -34,9 +34,15 @@ static double myEq(double x, double y)
 interval interval_algebra::Eq(const interval& x, const interval& y)
 {
     // boolean value => precision 0
-    if (x.isEmpty() || y.isEmpty()) return empty();
-    if (x.lo() == x.hi() && x.lo() == y.lo() && x.lo() == y.hi()) return interval{1,1,0};
-    if (x.hi() < y.lo() || x.lo() > y.hi()) return interval{0, 0, 0};
+    if (x.isEmpty() || y.isEmpty()) {
+        return interval::empty();
+    }
+    if (x.lo() == x.hi() && x.lo() == y.lo() && x.lo() == y.hi()) {
+        return interval{1, 1, 0};
+    }
+    if (x.hi() < y.lo() || x.lo() > y.hi()) {
+        return interval{0, 0, 0};
+    }
     return interval{0, 1, 0};
 }
 

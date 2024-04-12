@@ -29,7 +29,7 @@ namespace itv {
 interval interval_algebra::Sinh(const interval& x)
 {
     if (x.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
 
     double v    = 0;  // absolute lowest slope is at zero
@@ -42,8 +42,9 @@ interval interval_algebra::Sinh(const interval& x)
     }
 
     int precision = exactPrecisionUnary(sinh, v, sign * pow(2, x.lsb()));
-    if (precision == INT_MIN or taylor_lsb)
+    if (precision == INT_MIN or taylor_lsb) {
         precision = floor(x.lsb() + log2(cosh(v)));
+    }
 
     return {sinh(x.lo()), sinh(x.hi()), precision};
 }

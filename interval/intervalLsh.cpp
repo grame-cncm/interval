@@ -34,8 +34,9 @@ static double lsh(double x, double k)
 
 interval interval_algebra::Lsh(const interval& x, const interval& k)
 {
-    if (x.isEmpty() || k.isEmpty())
-        return empty();
+    if (x.isEmpty() || k.isEmpty()) {
+        return interval::empty();
+    }
 
     interval j{pow(2, k.lo()), pow(2, k.hi())};
     interval z = Mul(x, j);

@@ -38,10 +38,10 @@ static double addint(double x, double y)
 interval interval_algebra::Add(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
 
-    if (x.lsb() >= 0 and y.lsb() >= 0) { // if both intervals are integers
+    if (x.lsb() >= 0 and y.lsb() >= 0) {  // if both intervals are integers
         // if we're dealing with integers the interval has to wrap around 0
         const int xlo = (int)x.lo();
         const int xhi = (int)x.hi();
@@ -49,24 +49,22 @@ interval interval_algebra::Add(const interval& x, const interval& y)
         const int yhi = (int)y.hi();
 
         // detect wrapping
-        /* if (std::abs((double)xhi + (double)yhi) >= (double) INT_MAX 
-            or std::abs((double)xhi + (double)yhi) <= (double) INT_MIN 
+        /* if (std::abs((double)xhi + (double)yhi) >= (double) INT_MAX
+            or std::abs((double)xhi + (double)yhi) <= (double) INT_MIN
             or std::abs((double)xlo + (double)ylo) >= (double) INT_MAX
             or std::abs((double)xlo + (double)ylo) <= (double) INT_MIN)
             return {(double) INT_MIN, (double) INT_MAX, std::min(x.lsb(), y.lsb())};*/
-        
+
         double lo = x.lo() + y.lo();
         double hi = x.hi() + y.hi();
 
         // if there is a discontinuity by the lower end of integers
-        if (lo <= (double)INT_MIN -1 and hi >= (double)INT_MIN)
-        {
+        if (lo <= (double)INT_MIN - 1 and hi >= (double)INT_MIN) {
             return {(double)INT_MIN, (double)INT_MAX, std::min(x.lsb(), y.lsb())};
         }
-        
+
         // if there is a discontinuity by the higher end of integers
-        if (lo <= (double)INT_MAX and hi >= (double)INT_MAX+1)
-        {
+        if (lo <= (double)INT_MAX and hi >= (double)INT_MAX + 1) {
             return {(double)INT_MIN, (double)INT_MAX, std::min(x.lsb(), y.lsb())};
         }
 
@@ -75,8 +73,9 @@ interval interval_algebra::Add(const interval& x, const interval& y)
     }
 
     return {x.lo() + y.lo(), x.hi() + y.hi(),
-            std::min(x.lsb(),
-                     y.lsb())};  // the result of an addition needs to be only as precise as the most precise of the operands
+            std::min(
+                x.lsb(),
+                y.lsb())};  // the result of an addition needs to be only as precise as the most precise of the operands
 }
 
 void interval_algebra::testAdd()
@@ -96,9 +95,13 @@ void interval_algebra::testAdd()
 
     std::cout << "Testing add with wrapping" << std::endl;
 
-    analyzeBinaryMethod(10, 2000, "add", interval(0, pow(2, 31), 0), interval(0, pow(2, 31), 0), addint, &interval_algebra::Add);
-    analyzeBinaryMethod(10, 2000, "add", interval((double)INT_MAX/2, (double)INT_MAX, 0), interval((double)INT_MAX/2, (double)INT_MAX, 0), addint, &interval_algebra::Add);
-    analyzeBinaryMethod(10, 2000, "add", interval((double)INT_MIN, (double)INT_MIN/2, 0), interval((double)INT_MAX/2, (double)INT_MAX, 0), addint, &interval_algebra::Add);
-    analyzeBinaryMethod(10, 2000, "add", interval((double)INT_MIN, (double)INT_MIN/2, 0), interval((double)INT_MIN, (double)INT_MIN/2, 0), addint, &interval_algebra::Add);
+    analyzeBinaryMethod(10, 2000, "add", interval(0, pow(2, 31), 0), interval(0, pow(2, 31), 0), addint,
+                        &interval_algebra::Add);
+    analyzeBinaryMethod(10, 2000, "add", interval((double)INT_MAX / 2, (double)INT_MAX, 0),
+                        interval((double)INT_MAX / 2, (double)INT_MAX, 0), addint, &interval_algebra::Add);
+    analyzeBinaryMethod(10, 2000, "add", interval((double)INT_MIN, (double)INT_MIN / 2, 0),
+                        interval((double)INT_MAX / 2, (double)INT_MAX, 0), addint, &interval_algebra::Add);
+    analyzeBinaryMethod(10, 2000, "add", interval((double)INT_MIN, (double)INT_MIN / 2, 0),
+                        interval((double)INT_MIN, (double)INT_MIN / 2, 0), addint, &interval_algebra::Add);
 }
 }  // namespace itv

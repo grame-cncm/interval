@@ -33,14 +33,13 @@ interval interval_algebra::Log(const interval& x)
     interval i = intersection(x, domain);
 
     if (i.isEmpty()) {
-        return empty();
+        return i;
     }
 
     // lowest slope is at the highest bound of the interval
     int precision = exactPrecisionUnary(
-       log, i.hi(), -pow(2, i.lsb()));  // -pow because we take the FP number right before the higher bound
-    if (precision == INT_MIN or taylor_lsb)
-    {
+        log, i.hi(), -pow(2, i.lsb()));  // -pow because we take the FP number right before the higher bound
+    if (precision == INT_MIN or taylor_lsb) {
         /* double delta     = -log(1 - pow(2, i.lsb()) / i.hi());
         precision = floor((double)log2(delta));*/
         precision = floor(i.lsb() - (double)log2(abs(i.hi())));

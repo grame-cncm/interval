@@ -108,7 +108,7 @@ interval bmAnd(const interval& x, int mask)
 /*
 interval interval_algebra::And(const interval& x, const interval& y)
 {
-    if (x.isEmpty() || y.isEmpty()) return {};
+    if (x.isEmpty() || y.isEmpty()) return interval::empty();
     if (x.isconst()) {
         return bmAnd(y, bitmask(x.hi()));
     } else if (y.isconst()) {
@@ -130,7 +130,7 @@ interval interval_algebra::And(const interval& x, const interval& y)
 interval interval_algebra::And(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
     int x0 = saturatedIntCast(x.lo());
     int x1 = saturatedIntCast(x.hi());
@@ -166,7 +166,7 @@ interval interval_algebra::And(const interval& x, const interval& y)
         }
     }*/
 
-    return {double(z.lo), double(z.hi), 
+    return {double(z.lo), double(z.hi),
             // std::max(precision, std::max(precisionx, precisiony))
             precision};
 }

@@ -27,7 +27,7 @@ namespace itv {
 interval interval_algebra::Neg(const interval& x)
 {
     if (x.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
 
     return {-x.hi(), -x.lo(), x.lsb()};

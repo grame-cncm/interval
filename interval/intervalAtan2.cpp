@@ -31,8 +31,9 @@ namespace itv {
 // (where (x,y) are the cartesian coordinates of the point we wish to retrieve the angle of)
 interval interval_algebra::Atan2(const interval& y, const interval& x)
 {
-    if (x.isEmpty() || y.isEmpty())
-        return empty();
+    if (x.isEmpty() || y.isEmpty()) {
+        return interval::empty();
+    }
 
     double lo = -M_PI;
     double hi = M_PI;
@@ -45,7 +46,7 @@ interval interval_algebra::Atan2(const interval& y, const interval& x)
     // atan2(y, x) = atan(y/x) + constant: precision is that of y/x compounded with that of atan
     // cf https://en.wikipedia.org/wiki/Atan2#Definition_and_computation
 
-    if (y.lo() <= 0 and x.hasZero()) // if we intersect the Ox- axis
+    if (y.lo() <= 0 and x.hasZero())  // if we intersect the Ox- axis
     {
         /* interval yp = {0, y.hi(), y.lsb()}; // positive part of y
         interval yn = {y.lo(), 0, y.lsb()}; // negative part of y*/
@@ -113,11 +114,12 @@ interval interval_algebra::Atan2(const interval& y, const interval& x)
 void interval_algebra::testAtan2()
 {
     // std::cout << "Atan2 not implemented" << std::endl;
-    /* analyzeBinaryMethod(10, 1000000, "atan2", interval(1, 2, -24), interval(1, 2, -24), atan2, &interval_algebra::Atan2);
-    analyzeBinaryMethod(10, 1000000, "atan2", interval(-1, 2, -24), interval(1, 2, -24), atan2, &interval_algebra::Atan2);
-    analyzeBinaryMethod(10, 1000000, "atan2", interval(-2, -1, -24), interval(1, 2, -24), atan2, &interval_algebra::Atan2);
-    analyzeBinaryMethod(10, 1000000, "atan2", interval(-2, -1, -24), interval(-1, 2, -24), atan2, &interval_algebra::Atan2);
-    analyzeBinaryMethod(10, 1000000, "atan2", interval(-2, -1, -24), interval(-2, -1, -24), atan2, &interval_algebra::Atan2);*/
+    /* analyzeBinaryMethod(10, 1000000, "atan2", interval(1, 2, -24), interval(1, 2, -24), atan2,
+    &interval_algebra::Atan2); analyzeBinaryMethod(10, 1000000, "atan2", interval(-1, 2, -24), interval(1, 2, -24),
+    atan2, &interval_algebra::Atan2); analyzeBinaryMethod(10, 1000000, "atan2", interval(-2, -1, -24), interval(1, 2,
+    -24), atan2, &interval_algebra::Atan2); analyzeBinaryMethod(10, 1000000, "atan2", interval(-2, -1, -24),
+    interval(-1, 2, -24), atan2, &interval_algebra::Atan2); analyzeBinaryMethod(10, 1000000, "atan2", interval(-2, -1,
+    -24), interval(-2, -1, -24), atan2, &interval_algebra::Atan2);*/
 
     analyzeBinaryMethod(10, 1000000, "atan2", interval(-1, 2, -24), interval(-1, 2, -24), atan2,
                         &interval_algebra::Atan2);

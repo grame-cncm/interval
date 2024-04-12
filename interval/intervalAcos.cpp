@@ -30,9 +30,9 @@ static const interval AcosDomain(-1, 1, 0);  // this interval needs 0 digits of 
 
 interval interval_algebra::Acos(const interval& x)
 {
-    interval i = intersection(AcosDomain, x); // TODO: warn about interval violations
+    interval i = intersection(AcosDomain, x);  // TODO: warn about interval violations
     if (i.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
 
     double v = 0;  // value at which the min slope is attained, zero if it is present
@@ -46,8 +46,9 @@ interval interval_algebra::Acos(const interval& x)
 
     int precision = exactPrecisionUnary(acos, v, sign * pow(2, i.lsb()));
 
-    if (precision == INT_MIN or taylor_lsb)
-        precision = floor(i.lsb() - (double)log2(1 - v*v)/2);
+    if (precision == INT_MIN or taylor_lsb) {
+        precision = floor(i.lsb() - (double)log2(1 - v * v) / 2);
+    }
 
     return {acos(i.hi()), acos(i.lo()), precision};
 }

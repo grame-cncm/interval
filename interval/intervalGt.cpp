@@ -27,20 +27,20 @@ namespace itv {
 // void testGt();
 
 static double myGt(double x, double y)
-{ 
+{
     return (x > y);
 }
 
 interval interval_algebra::Gt(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
     if (x.lo() > y.hi()) {
-        return interval{1,1,0};
+        return interval{1, 1, 0};
     }
     if (x.hi() <= y.lo()) {
-        return interval{0,0,0};
+        return interval{0, 0, 0};
     }
     return interval{0, 1, 0};
 }

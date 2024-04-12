@@ -28,10 +28,12 @@ namespace itv {
 
 interval interval_algebra::Round(const interval& x)
 {
-    if (x.isEmpty())
-        return empty();
+    if (x.isEmpty()) {
+        return x;
+    }
 
-    return {round(x.lo()), round(x.hi()), std::max(0, x.lsb())}; // round to integral value (regardless of rounding direction) => integer => precision 0
+    // round to integral value (regardless of rounding direction) => integer => precision 0
+    return {round(x.lo()), round(x.hi()), std::max(0, x.lsb())};
 }
 
 void interval_algebra::testRound()

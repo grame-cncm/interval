@@ -28,20 +28,19 @@ namespace itv {
 
 interval interval_algebra::Abs(const interval& x)
 {
-    if (x.isEmpty())
-        return empty();
+    if (x.isEmpty()) {
+        return interval::empty();
+    }
 
     // precision stays the same
     if (x.lo() >= 0) {
         return x;
     }
-    
+
     // integer overflowing
-    if (x.lsb() >= 0 and x.lo() <= (double)INT_MIN){ 
+    if (x.lsb() >= 0 and x.lo() <= (double)INT_MIN) {
         double lo = (x.hi() >= 0) ? 0 : std::min(std::abs(x.hi()), (double)INT_MAX);
-        return {lo,
-                (double)INT_MAX, 
-                x.lsb()};
+        return {lo, (double)INT_MAX, x.lsb()};
     }
     if (x.hi() <= 0) {
         return {-x.hi(), -x.lo(), x.lsb()};

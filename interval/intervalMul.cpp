@@ -43,7 +43,7 @@ static double specialmultint(double a, double b)
 interval interval_algebra::Mul(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
     double a = specialmult(x.lo(), y.lo());
     double b = specialmult(x.lo(), y.hi());
@@ -53,12 +53,14 @@ interval interval_algebra::Mul(const interval& x, const interval& y)
     double lo = min4(a, b, c, d);
     double hi = max4(a, b, c, d);
 
-    if (x.lsb() >= 0 and y.lsb() >= 0) // operation between integers
+    if (x.lsb() >= 0 and y.lsb() >= 0)  // operation between integers
     {
         // if the quotient of an INT limit by an interval limit is below a limit of the other interval
         // ie, if there is something big enough in the other interval to make the interval limit go beyond an INT limit
-        if (std::max(std::abs(x.lo()), std::abs(x.hi()))*std::max(std::abs(y.lo()), std::abs(y.hi())) >= (double) INT_MAX)
-            return {(double) INT_MIN, (double) INT_MAX, x.lsb() + y.lsb()};
+        if (std::max(std::abs(x.lo()), std::abs(x.hi())) * std::max(std::abs(y.lo()), std::abs(y.hi())) >=
+            (double)INT_MAX) {
+            return {(double)INT_MIN, (double)INT_MAX, x.lsb() + y.lsb()};
+        }
         /* interval z{lo, hi, x.lsb()+y.lsb()};
         interval shift{pow(2, 31), pow(2, 31), 31};
         interval m{pow(2, 32), pow(2, 32), 32};
@@ -66,7 +68,7 @@ interval interval_algebra::Mul(const interval& x, const interval& y)
         return Sub(Mod(Add(z, shift), m), shift);*/
 
         /* if ((lo <= (double)INT_MIN - 1 and hi >= (double)INT_MIN) // discontinuity at the lower end
-        or 
+        or
         (lo <= (double)INT_MAX and hi >= (double)INT_MAX+1))
         {
             return {(double)INT_MIN, (double)INT_MAX, std::min(x.lsb(), y.lsb())};
@@ -80,8 +82,7 @@ interval interval_algebra::Mul(const interval& x, const interval& y)
         return {min4(aint, bint, cint, dint), max4(aint, bint, cint, dint), x.lsb() + y.lsb()};*/
     }
 
-    return {lo, hi,
-            x.lsb() + y.lsb()};  // the worst case, we need all the precision digits from both the operands
+    return {lo, hi, x.lsb() + y.lsb()};  // the worst case, we need all the precision digits from both the operands
 }
 
 void interval_algebra::testMul()
@@ -92,23 +93,26 @@ void interval_algebra::testMul()
     check("test algebra Mul", Mul(interval(0), interval(-HUGE_VAL, HUGE_VAL)), interval(0));
     check("test algebra Mul", Mul(interval(-HUGE_VAL, HUGE_VAL), interval(0)), interval(0));*/
 
-    // analyzeBinaryMethod(10, 2000, "mul", interval(0, 10, 0), interval(0, 10, 0), specialmult, &interval_algebra::Mul);
-    /* analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -5), interval(0, 10, 0), specialmult, &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -10), interval(0, 10, 0), specialmult, &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -15), interval(0, 10, 0), specialmult, &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, 0), interval(0, 10, -10), specialmult, &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -5), interval(0, 10, -10), specialmult,
-                        &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -10), interval(0, 10, -10), specialmult,
-                        &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -15), interval(0, 10, -10), specialmult,
-                        &interval_algebra::Mul);
+    // analyzeBinaryMethod(10, 2000, "mul", interval(0, 10, 0), interval(0, 10, 0), specialmult,
+    // &interval_algebra::Mul);
+    /* analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -5), interval(0, 10, 0), specialmult,
+    &interval_algebra::Mul); analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -10), interval(0, 10, 0),
+    specialmult, &interval_algebra::Mul); analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -15), interval(0, 10,
+    0), specialmult, &interval_algebra::Mul); analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, 0), interval(0, 10,
+    -10), specialmult, &interval_algebra::Mul); analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -5), interval(0,
+    10, -10), specialmult, &interval_algebra::Mul); analyzeBinaryMethod(10, 20000, "mul", interval(0, 10, -10),
+    interval(0, 10, -10), specialmult, &interval_algebra::Mul); analyzeBinaryMethod(10, 20000, "mul", interval(0, 10,
+    -15), interval(0, 10, -10), specialmult, &interval_algebra::Mul);
 
-    analyzeBinaryMethod(10, 200000, "mul", interval(-pow(2, 31), pow(2, 31), 0), interval(-pow(2, 31), pow(2, 31), 0), specialmultint, &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 200000, "mul", interval((double)INT_MAX/2, (double)INT_MAX, 0), interval((double)INT_MAX/2, (double)INT_MAX, 0), specialmultint, &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 200000, "mul", interval((double)INT_MIN, (double)INT_MIN/2, 0), interval((double)INT_MAX/2, (double)INT_MAX, 0), specialmultint, &interval_algebra::Mul);
-    analyzeBinaryMethod(10, 2000000, "mul", interval((double)2*INT_MAX/3, (double)INT_MAX, 0), interval(0, 10, 0), specialmultint, &interval_algebra::Mul);*/
-    check("Test integer Mult", Mul(interval(pow(2, 30), pow(2, 30)+2, 2), interval(1, 2, 0)), interval((double)INT_MIN, pow(2, 30)+2, 0));
-    // analyzeBinaryMethod(10, 2000, "mul", interval((double)INT_MAX-1, (double)INT_MAX, 0), interval((double)INT_MAX-1, (double)INT_MAX, 0), specialmultint, &interval_algebra::Mul);
+    analyzeBinaryMethod(10, 200000, "mul", interval(-pow(2, 31), pow(2, 31), 0), interval(-pow(2, 31), pow(2, 31), 0),
+    specialmultint, &interval_algebra::Mul); analyzeBinaryMethod(10, 200000, "mul", interval((double)INT_MAX/2,
+    (double)INT_MAX, 0), interval((double)INT_MAX/2, (double)INT_MAX, 0), specialmultint, &interval_algebra::Mul);
+    analyzeBinaryMethod(10, 200000, "mul", interval((double)INT_MIN, (double)INT_MIN/2, 0), interval((double)INT_MAX/2,
+    (double)INT_MAX, 0), specialmultint, &interval_algebra::Mul); analyzeBinaryMethod(10, 2000000, "mul",
+    interval((double)2*INT_MAX/3, (double)INT_MAX, 0), interval(0, 10, 0), specialmultint, &interval_algebra::Mul);*/
+    check("Test integer Mult", Mul(interval(pow(2, 30), pow(2, 30) + 2, 2), interval(1, 2, 0)),
+          interval((double)INT_MIN, pow(2, 30) + 2, 0));
+    // analyzeBinaryMethod(10, 2000, "mul", interval((double)INT_MAX-1, (double)INT_MAX, 0), interval((double)INT_MAX-1,
+    // (double)INT_MAX, 0), specialmultint, &interval_algebra::Mul);
 }
 }  // namespace itv

@@ -34,9 +34,15 @@ static double myGe(double x, double y)
 interval interval_algebra::Ge(const interval& x, const interval& y)
 {
     // boolean value => precision 0
-    if (x.isEmpty() || y.isEmpty()) return empty();
-    if (x.lo() >= y.hi()) return interval{1,1,0};
-    if (x.hi() < y.lo()) return interval{0,0,0};
+    if (x.isEmpty() || y.isEmpty()) {
+        return interval::empty();
+    }
+    if (x.lo() >= y.hi()) {
+        return interval{1, 1, 0};
+    }
+    if (x.hi() < y.lo()) {
+        return interval{0, 0, 0};
+    }
     return interval{0, 1, 0};
 }
 
@@ -44,8 +50,8 @@ void interval_algebra::testGe()
 {
     /* check("test algebra Ge", Ge(interval(5), interval(5)), interval(1));
     check("test algebra Ge", Ge(interval(2, 5), interval(0, 1)), interval(1));
-    check("test algebra Ge", Ge(interval(-1, 1), interval(0, 10)), interval(0, 1));*/ 
-    
+    check("test algebra Ge", Ge(interval(-1, 1), interval(0, 10)), interval(0, 1));*/
+
     analyzeBinaryMethod(10, 200, "Ge", interval(-1, 1, 0), interval(-1, 1, 0), myGe, &interval_algebra::Ge);
     analyzeBinaryMethod(10, 200, "Ge", interval(-10, 10, 0), interval(-10, 10, 0), myGe, &interval_algebra::Ge);
     analyzeBinaryMethod(10, 2000, "Ge", interval(-10, 10), interval(-10, 10), myGe, &interval_algebra::Ge);

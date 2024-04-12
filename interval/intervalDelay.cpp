@@ -29,7 +29,7 @@ namespace itv {
 interval interval_algebra::Delay(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
     if (y.isZero()) {
         return x;

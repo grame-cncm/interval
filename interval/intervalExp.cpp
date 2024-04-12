@@ -29,7 +29,7 @@ namespace itv {
 interval interval_algebra::Exp(const interval& x)
 {
     if (x.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
 
     // lowest slope is attained at the lowest boundary

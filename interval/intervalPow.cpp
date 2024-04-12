@@ -36,7 +36,7 @@ static interval ipow(const interval& x, int k)
 {
     assert(k >= 0);
     if (k == 0) {
-        return interval{1,1,0};
+        return interval{1, 1, 0};
     }
 
     // explicit expression because passing an anonymous function to exactPrecisionUnary is complicated
@@ -47,11 +47,10 @@ static interval ipow(const interval& x, int k)
         int    p1   = k * (int)log2(abs(v));
         int    p2   = 0;
 
-        double u = pow(2, x.lsb()); // ulp
-        double delta   = abs(pow(1 + sign * u / v, k) - 1);
-        if (delta == 0) {  // in case of u << x
-            p2 = floor((double)log2(k) + x.lsb() -
-                       (double)log2(abs(v)));  // (1 + u/v)^k - 1 ≃ k*u/v if u/v very small
+        double u     = pow(2, x.lsb());  // ulp
+        double delta = abs(pow(1 + sign * u / v, k) - 1);
+        if (delta == 0) {                                                  // in case of u << x
+            p2 = floor((double)log2(k) + x.lsb() - (double)log2(abs(v)));  // (1 + u/v)^k - 1 ≃ k*u/v if u/v very small
         } else {
             p2 = floor((double)log2(delta));
         }
@@ -76,8 +75,9 @@ static interval ipow(const interval& x, int k)
  */
 interval interval_algebra::fPow(const interval& x, const interval& y)
 {
-    if (x.isEmpty() || y.isEmpty())
-        return empty();
+    if (x.isEmpty() || y.isEmpty()) {
+        return interval::empty();
+    }
 
     assert(x.lo() > 0);
     // x all positive
@@ -86,8 +86,9 @@ interval interval_algebra::fPow(const interval& x, const interval& y)
 
 interval interval_algebra::iPow(const interval& x, const interval& y)
 {
-    if (x.isEmpty() || y.isEmpty())
-        return empty();
+    if (x.isEmpty() || y.isEmpty()) {
+        return interval::empty();
+    }
 
     int      y0 = std::max(0, saturatedIntCast(y.lo()));
     int      y1 = std::max(0, saturatedIntCast(y.hi()));
@@ -126,14 +127,17 @@ void interval_algebra::testPow()
     analyzeBinaryMethod(10, 2000000, "iPow^2", interval(-1, 1), interval(2), myiPow, &interval_algebra::iPow);
     analyzeBinaryMethod(10, 2000000, "iPow^3", interval(-1, 1), interval(3), myiPow, &interval_algebra::iPow);*/
 
-    analyzeBinaryMethod(5, 2000000, "iPow2", interval(-100, 100, 0), interval(0, 200, 0), myiPow, &interval_algebra::iPow);
-    analyzeBinaryMethod(5, 2000000, "iPow2", interval(-100, 100, -5), interval(0, 200, 0), myiPow, &interval_algebra::iPow);
-    analyzeBinaryMethod(5, 2000000, "iPow2", interval(-100, 100, 0), interval(0, 200, -5), myiPow, &interval_algebra::iPow);
-    
+    analyzeBinaryMethod(5, 2000000, "iPow2", interval(-100, 100, 0), interval(0, 200, 0), myiPow,
+                        &interval_algebra::iPow);
+    analyzeBinaryMethod(5, 2000000, "iPow2", interval(-100, 100, -5), interval(0, 200, 0), myiPow,
+                        &interval_algebra::iPow);
+    analyzeBinaryMethod(5, 2000000, "iPow2", interval(-100, 100, 0), interval(0, 200, -5), myiPow,
+                        &interval_algebra::iPow);
+
     analyzeBinaryMethod(5, 2000000, "iPow2", interval(-1, 1, 0), interval(1, 3, 0), myiPow, &interval_algebra::iPow);
     analyzeBinaryMethod(5, 2000000, "iPow2", interval(-1, 1, -5), interval(1, 3, 0), myiPow, &interval_algebra::iPow);
     analyzeBinaryMethod(5, 2000000, "iPow2", interval(-1, 1, 0), interval(1, 3, -5), myiPow, &interval_algebra::iPow);
-    
+
     analyzeBinaryMethod(5, 2000000, "iPow2", interval(-1, 1), interval(1, 10), myiPow, &interval_algebra::iPow);
     analyzeBinaryMethod(5, 2000000, "iPow2", interval(-1, 1), interval(1, 10), myiPow, &interval_algebra::iPow);
     analyzeBinaryMethod(5, 2000000, "iPow2", interval(-1, 1), interval(1, 10), myiPow, &interval_algebra::iPow);

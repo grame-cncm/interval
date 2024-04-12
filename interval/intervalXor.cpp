@@ -38,7 +38,7 @@ static double myXor(double x, double y)
 interval interval_algebra::Xor(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
     auto x0 = saturatedIntCast(x.lo());
     auto x1 = saturatedIntCast(x.hi());

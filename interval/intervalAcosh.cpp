@@ -32,15 +32,16 @@ interval interval_algebra::Acosh(const interval& x)
 {
     interval i = intersection(domain, x);
     if (i.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
 
     // the min slope is attained at the highest bound of the interval
     // we thus compute the gap between f(hi) and f(hi-ε), to remain in the interval
     int precision = exactPrecisionUnary(acosh, x.hi(), -pow(2, x.lsb()));
 
-    if (precision == INT_MIN or taylor_lsb)
-        precision = floor(x.lsb() - (double)log2(x.hi()*x.hi() - 1)/2);
+    if (precision == INT_MIN or taylor_lsb) {
+        precision = floor(x.lsb() - (double)log2(x.hi() * x.hi() - 1) / 2);
+    }
 
     return {acosh(i.lo()), acosh(i.hi()), precision};
 }

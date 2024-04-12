@@ -24,8 +24,9 @@ namespace itv {
 interval interval_algebra::HSlider(const interval& name, const interval& init, const interval& lo, const interval& hi,
                                    const interval& step)
 {
-    if (init.isEmpty() || lo.isEmpty() || hi.isEmpty() || step.isEmpty())
-        return empty();
+    if (init.isEmpty() || lo.isEmpty() || hi.isEmpty() || step.isEmpty()) {
+        return interval::empty();
+    }
 
     // elements of a slider with range [lo; hi] and step s are of the form lo + k·s <= hi with k an integer
     // the precision needed to represent such elements is the minimum between
@@ -34,6 +35,6 @@ interval interval_algebra::HSlider(const interval& name, const interval& init, c
         lsb = std::min(lsb, (int)log2(step.lo()));  // and that associated to the smallest value the step can take
     }
 
-    return {lo.lo(), hi.hi(), lsb}; 
+    return {lo.lo(), hi.hi(), lsb};
 }
 }  // namespace itv

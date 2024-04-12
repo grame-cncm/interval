@@ -29,17 +29,18 @@ static const interval domain(-HUGE_VAL, HUGE_VAL);
 
 interval interval_algebra::Asinh(const interval& x)
 {
-    if (x.isEmpty())
-        return empty();
+    if (x.isEmpty()) {
+        return interval::empty();
+    }
 
     double v    = maxValAbs(x);  // value at which the min slope is attained, here the bound of highest absolute value
     int    sign = signMaxValAbs(x);  // whether we compute the difference between f(v) and f(v+ε) or f(v-ε)
 
     int precision = exactPrecisionUnary(asinh, v, sign * pow(2, x.lsb()));
 
-    if (precision == INT_MIN or taylor_lsb)
-        precision = floor(x.lsb() - (double)log2(1 + v*v)/2);
-
+    if (precision == INT_MIN or taylor_lsb) {
+        precision = floor(x.lsb() - (double)log2(1 + v * v) / 2);
+    }
 
     return {asinh(x.lo()), asinh(x.hi()), precision};
 }

@@ -29,7 +29,7 @@ namespace itv {
 interval interval_algebra::Mem(const interval& x)
 {
     if (x.isEmpty()) {
-        return empty();
+        return interval::empty();
     }
     interval z = reunion(x, interval{0});
     return {z.lo(), z.hi(), x.lsb()};
