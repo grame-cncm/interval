@@ -22,6 +22,7 @@ interval interval_algebra::Output(const interval& c, const interval& y)
 {
     return interval(0);
 }
+
 interval interval_algebra::Button(const interval& name)
 {
     return interval(0);

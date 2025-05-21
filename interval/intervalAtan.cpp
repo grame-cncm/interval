@@ -32,7 +32,7 @@ namespace itv {
 interval interval_algebra::Atan(const interval& x)
 {
     if (x.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     double v = maxValAbs(
@@ -42,7 +42,7 @@ interval interval_algebra::Atan(const interval& x)
 
     int precision = exactPrecisionUnary(atan, v, sign * pow(2, x.lsb()));
 
-    if (precision == INT_MIN or taylor_lsb) {
+    if ((precision == INT_MIN) || taylor_lsb) {
         precision = floor(x.lsb() - (double)log2(1 + v * v));
     }
 

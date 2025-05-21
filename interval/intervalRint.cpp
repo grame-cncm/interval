@@ -29,7 +29,7 @@ namespace itv {
 interval interval_algebra::Rint(const interval& x)
 {
     if (x.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     return {rint(x.lo()), rint(x.hi()),

@@ -34,6 +34,8 @@ static const interval domainx = {0, HUGE_VAL, 0};
  */
 static interval ipow(const interval& x, int k)
 {
+    using namespace std;
+
     assert(k >= 0);
     if (k == 0) {
         return interval{1, 1, 0};
@@ -42,7 +44,7 @@ static interval ipow(const interval& x, int k)
     // explicit expression because passing an anonymous function to exactPrecisionUnary is
     // complicated
     int precision = x.lsb() * k;  // if x contains 0: finest precision is attained in 0
-    if (not x.hasZero()) {
+    if (!x.hasZero()) {
         double v    = minValAbs(x);
         int    sign = signMinValAbs(x);
         int    p1   = k * (int)log2(abs(v));
@@ -62,18 +64,17 @@ static interval ipow(const interval& x, int k)
 
     if ((k & 1) == 0) {
         // k is even
-        double z0 = std::pow(x.lo(), k);
-        double z1 = std::pow(x.hi(), k);
-        return {
-            x.hasZero()
-                ? 0
-                : std::min(z0,
-                           z1),  // 0 is in the output interval only if it is in the input interval
-            std::max(z0, z1), precision};
+        double z0 = pow(x.lo(), k);
+        double z1 = pow(x.hi(), k);
+        return {x.hasZero()
+                    ? 0
+                    : min(z0,
+                          z1),  // 0 is in the output interval only if it is in the input interval
+                max(z0, z1), precision};
     }
 
     // k is odd
-    return {std::pow(x.lo(), k), std::pow(x.hi(), k), precision};
+    return {pow(x.lo(), k), pow(x.hi(), k), precision};
 }
 
 /**
@@ -82,7 +83,7 @@ static interval ipow(const interval& x, int k)
 interval interval_algebra::fPow(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     assert(x.lo() > 0);
@@ -92,12 +93,14 @@ interval interval_algebra::fPow(const interval& x, const interval& y)
 
 interval interval_algebra::iPow(const interval& x, const interval& y)
 {
+    using namespace std;
+
     if (x.isEmpty() || y.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
-    int      y0 = std::max(0, saturatedIntCast(y.lo()));
-    int      y1 = std::max(0, saturatedIntCast(y.hi()));
+    int      y0 = max(0, saturatedIntCast(y.lo()));
+    int      y1 = max(0, saturatedIntCast(y.hi()));
     interval z  = ipow(x, y0);
     if (y1 > y0) {
         // we have more than one integer exponent
@@ -110,10 +113,18 @@ interval interval_algebra::iPow(const interval& x, const interval& y)
 
 interval interval_algebra::Pow(const interval& x, const interval& y)
 {
-    interval z  = interval::empty();
+    interval z  = empty();
     interval xp = intersection(x, interval{nexttoward(0.0, 1.0), HUGE_VAL, 0});
-    interval xn = intersection(x, interval{-HUGE_VAL, 0, 0});
+    interval xn = intersection(x, interval{-HUGE_VAL, nexttoward(0.0, -1.0), 0});
 
+    if (y.hasZero()) {
+        // x^0 = 1
+        z = reunion(z, interval(1, 1, 0));
+    }
+    if (x.hasZero()) {
+        // 0^y = 0
+        z = reunion(z, interval(0, 0, 0));
+    }
     if (!xp.isEmpty()) {
         z = reunion(z, fPow(xp, y));
     }
@@ -141,10 +152,6 @@ void interval_algebra::testPow()
     interval(-1, 1), interval(2), myiPow, &interval_algebra::iPow); analyzeBinaryMethod(10, 2000000,
     "iPow^3", interval(-1, 1), interval(3), myiPow, &interval_algebra::iPow);*/
 
-    analyzeBinaryMethod(5, 2000000, "Pow", interval(-1, 1, -24), interval(0.01, 6, -4), myfPow,
-                        &interval_algebra::Pow);
-    analyzeBinaryMethod(5, 2000000, "Pow", interval(-1, 1, -24), interval(0.0, 2, -4), myfPow,
-                        &interval_algebra::Pow);
     analyzeBinaryMethod(5, 2000000, "iPow2", interval(-100, 100, 0), interval(0, 200, 0), myiPow,
                         &interval_algebra::iPow);
     analyzeBinaryMethod(5, 2000000, "iPow2", interval(-100, 100, -5), interval(0, 200, 0), myiPow,

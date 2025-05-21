@@ -33,15 +33,15 @@ interval interval_algebra::Sqrt(const interval& x)
     interval i = intersection(SqrtDomain, x);
 
     if (i.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
     /* if (i.lo() < 0) {
-        return interval::empty();  // sqrt of negative numbers
+        return {};  // sqrt of negative numbers
     }*/
 
     // lowest slope at the highest bound of the interval
     int precision = exactPrecisionUnary(sqrt, i.hi(), -pow(2, i.lsb()));
-    if (precision == INT_MIN or taylor_lsb) {
+    if ((precision == INT_MIN) || taylor_lsb) {
         if (i.hi() == 0) {
             precision = floor(i.lsb() / 2);
         } else {

@@ -29,7 +29,7 @@ namespace itv {
 interval interval_algebra::Max(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     return {std::max(x.lo(), y.lo()), std::max(x.hi(), y.hi()),

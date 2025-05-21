@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <string>
 
@@ -56,7 +57,7 @@ class interval {
     // constructors
     //-------------------------------------------------------------------------
 
-    interval() = default;  // Full: [lowest, max] floating point interval
+    interval() = default;
 
     interval(double n, double m, int lsb = -24) noexcept
     {
@@ -75,9 +76,27 @@ class interval {
         }
     }
 
-    explicit interval(double n) noexcept : interval(n, n) {}
-
-    static interval empty() noexcept { return {NAN, NAN, 0}; }
+    explicit interval(double x) noexcept
+    {
+        if (x == 0) {
+            fLo  = 0;
+            fHi  = 0;
+            fLSB = 0;
+        } else {
+            // compute the preficion needed to represent x
+            // in the form x = 2^p * y, where y is an integer
+            int    p = 0;
+            double y = x;
+            double ipart;
+            while (std::modf(y, &ipart) != 0.0) {
+                y *= 2.0;
+                p--;
+            }
+            fLo  = x;
+            fHi  = x;
+            fLSB = p;
+        }
+    }
 
     // interval(const interval& r) : fEmpty(r.empty()), fLo(r.lo()), fHi(r.hi())
     // {}
@@ -116,18 +135,20 @@ class interval {
     // position of the most significant bit of the value, without taking the sign bit into account
     int msb() const
     {
-        if (fLo == 0 and fHi == 0) {
+        if ((fLo == 0) && (fHi == 0)) {
             return 0;
         }
 
         // amplitude of the interval
-        // can be < 1.0, in which case the msb will be negative and indicate the number of implicit leading zeroes
+        // can be < 1.0, in which case the msb will be negative and indicate the number of implicit
+        // leading zeroes
         double range = std::max(std::abs(fLo), std::abs(fHi));
 
         if (std::isinf(range)) {
             // if (fLSB == 0) // if we're dealing with integers: is that a good criterion?
             return 31;
-            // return 20;  // max MSB of the VHDL design; TODO: change when integrating in the compiler
+            // return 20;  // max MSB of the VHDL design; TODO: change when integrating in the
+            // compiler
         }
 
         int l = int(std::ceil(std::log2(range)));
@@ -141,7 +162,9 @@ class interval {
         if (isEmpty()) {
             return "[]";
         } else {
-            return '[' + std::to_string(fLo) + ',' + std::to_string(fHi) + ']';
+            char buffer[64];
+            snprintf(buffer, 63, "[%g, %g]", fLo, fHi);
+            return std::string(buffer);
         }
     }
 };
@@ -163,6 +186,11 @@ inline std::ostream& operator<<(std::ostream& dst, const interval& i)
 // set operations
 //-------------------------------------------------------------------------
 
+inline interval empty() noexcept
+{
+    return {NAN, NAN, 0};
+}
+
 inline interval intersection(const interval& i, const interval& j)
 {
     if (i.isEmpty()) {
@@ -172,9 +200,10 @@ inline interval intersection(const interval& i, const interval& j)
     } else {
         double l = std::max(i.lo(), j.lo());
         double h = std::min(i.hi(), j.hi());
-        int    p = std::min(i.lsb(), j.lsb());  // precision of the intersection should be the finest of the two
+        int    p = std::min(i.lsb(),
+                            j.lsb());  // precision of the intersection should be the finest of the two
         if (l > h) {
-            return interval::empty();
+            return empty();
         } else {
             return {l, h, p};
         }
@@ -190,7 +219,8 @@ inline interval reunion(const interval& i, const interval& j)
     } else {
         double l = std::min(i.lo(), j.lo());
         double h = std::max(i.hi(), j.hi());
-        int    p = std::min(i.lsb(), j.lsb());  // precision of the reunion should be the finest of the two
+        int    p =
+            std::min(i.lsb(), j.lsb());  // precision of the reunion should be the finest of the two
         return {l, h, p};
     }
 }
@@ -202,17 +232,25 @@ inline interval singleton(double x)
     }
 
     /* int precision = lsb;
-
-    while (floor(x * pow(2, -precision - 1)) == x * pow(2, -precision - 1) and x != 0) {
+    while (floor(x * pow(2, -precision - 1)) == x * pow(2, -precision - 1) && x != 0) {
         precision++;
-    }*/
+    }
+    */
 
-    int m = std::floor(std::log2(std::abs(x)));
+    // int m = std::floor(std::log2(std::abs(x)));
 
-    int precision = m - 32;  // 32 = set width
+    // int precision = m - 32;  // 32 = set width
 
-    return {x, x, precision};
+    int    p = 0;
+    double y = x;
+    double ipart;
+    while (std::modf(y, &ipart) != 0.0) {
+        y *= 2.0;
+        p--;
+    }
+    return {x, x, p};
 }
+
 //-------------------------------------------------------------------------
 // predicates
 //-------------------------------------------------------------------------
@@ -225,7 +263,7 @@ inline bool operator==(const interval& i, const interval& j)
 
 inline bool operator<=(const interval& i, const interval& j)
 {
-    return reunion(i, j) == j;
+    return (i.lo() >= j.lo()) && (i.hi() <= j.hi());
 }
 
 // additional predicates

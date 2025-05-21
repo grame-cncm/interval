@@ -35,11 +35,11 @@ static double cosPi(double x)
 interval interval_algebra::Cos(const interval& x)
 {
     if (x.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     int precision = exactPrecisionUnary(cos, 0, pow(2, x.lsb()));
-    if (precision == INT_MIN or taylor_lsb) {
+    if ((precision == INT_MIN) || taylor_lsb) {
         precision =
             2 * x.lsb() - 1;  // if x.lsb() is so small that the automatic computation doesn't work
     }
@@ -71,10 +71,10 @@ interval interval_algebra::Cos(const interval& x)
 
     double v = 0;  // value of the interval at which the finest precision is computed
 
-    if (i.hi() < 1 * M_PI or
-        (i.lo() > 1 * M_PI and
-         i.hi() < 2 * M_PI))  // if there are no integers in i, i.e i is included in ]0;1[ or ]1;2[
-    {
+    if ((i.hi() < 1 * M_PI) ||
+        ((i.lo() > 1 * M_PI) &&
+         i.hi() <
+             2 * M_PI)) {  // if there are no integers in i, i.e i is included in ]0;1[ or ]1;2[
         double delta_hi = ceil(x.hi() / M_PI) - x.hi() / M_PI;
         double delta_lo = x.lo() / M_PI - floor(x.lo() / M_PI);
         if (delta_hi < delta_lo) {  // if the lowest slope is attained for the higher bound
@@ -85,14 +85,12 @@ interval interval_algebra::Cos(const interval& x)
     }
 
     precision = exactPrecisionUnary(cos, v, pow(2, x.lsb()));
-    if (precision == INT_MIN or taylor_lsb) {
+    if ((precision == INT_MIN) || taylor_lsb) {
         /* cos(x + u) - cos(x) = - u·sin(x) if x != 0
                                 = - u^2/2 · cos(x) = -u^2/2 if x == 0*/
-
         if (v != 0) {
-            precision =
-                x.lsb() + (int)floor(log2(
-                              abs(sin(v))));  // (int)floor(log2(M_PI*abs(cos(M_PI*v)))) + x.lsb();
+            precision = x.lsb() + (int)floor(log2(std::abs(sin(
+                                      v))));  // (int)floor(log2(M_PI*abs(cos(M_PI*v)))) + x.lsb();
         } else {
             precision = 2 * x.lsb() - 1;  //- (int)floor(2*log2(M_PI));
         }

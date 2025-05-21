@@ -24,7 +24,7 @@ interval interval_algebra::VSlider(const interval& name, const interval& init, c
                                    const interval& hi, const interval& step)
 {
     if (init.isEmpty() || lo.isEmpty() || hi.isEmpty() || step.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     // elements of a slider with range [lo; hi] and step step are of the form lo + k·step <= hi with

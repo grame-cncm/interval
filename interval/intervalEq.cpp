@@ -35,7 +35,7 @@ interval interval_algebra::Eq(const interval& x, const interval& y)
 {
     // boolean value => precision 0
     if (x.isEmpty() || y.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
     if (x.lo() == x.hi() && x.lo() == y.lo() && x.lo() == y.hi()) {
         return interval{1, 1, 0};

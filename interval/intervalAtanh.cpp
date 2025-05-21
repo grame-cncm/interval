@@ -34,14 +34,14 @@ interval interval_algebra::Atanh(const interval& x)
 {
     interval i = intersection(domain, x);
     if (i.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     double v         = minValAbs(x);
     double sign      = signMinValAbs(x);
     int    precision = exactPrecisionUnary(atanh, v, sign * pow(2, x.lsb()));
 
-    if (precision == INT_MIN or taylor_lsb) {
+    if ((precision == INT_MIN) || taylor_lsb) {
         precision = floor(x.lsb() - (double)log2(1 - v * v));
     }
 

@@ -28,8 +28,10 @@ namespace itv {
 
 interval interval_algebra::Abs(const interval& x)
 {
+    using namespace std;
+
     if (x.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     // precision stays the same
@@ -38,15 +40,15 @@ interval interval_algebra::Abs(const interval& x)
     }
 
     // integer overflowing
-    if (x.lsb() >= 0 and x.lo() <= (double)INT_MIN) {
-        double lo = (x.hi() >= 0) ? 0 : std::min(std::abs(x.hi()), (double)INT_MAX);
+    if ((x.lsb() >= 0) && (x.lo() <= (double)INT_MIN)) {
+        double lo = (x.hi() >= 0) ? 0 : min(abs(x.hi()), (double)INT_MAX);
         return {lo, (double)INT_MAX, x.lsb()};
     }
     if (x.hi() <= 0) {
         return {-x.hi(), -x.lo(), x.lsb()};
     }
 
-    return {0, std::max(std::abs(x.lo()), std::abs(x.hi())), x.lsb()};
+    return {0, max(abs(x.lo()), abs(x.hi())), x.lsb()};
 }
 
 void interval_algebra::testAbs()

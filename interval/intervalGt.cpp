@@ -34,7 +34,7 @@ static double myGt(double x, double y)
 interval interval_algebra::Gt(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
     if (x.lo() > y.hi()) {
         return interval{1, 1, 0};

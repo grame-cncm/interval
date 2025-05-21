@@ -29,7 +29,7 @@ namespace itv {
 interval interval_algebra::Min(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
     return {std::min(x.lo(), y.lo()), std::min(x.hi(), y.hi()),

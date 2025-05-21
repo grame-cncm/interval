@@ -31,7 +31,7 @@ namespace itv {
 interval interval_algebra::IntCast(const interval& x)
 {
     if (x.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
     return {double(saturatedIntCast(x.lo())), double(saturatedIntCast(x.hi())),
             0};  // integer intervals have 0 bits of precision

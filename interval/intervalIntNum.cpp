@@ -15,7 +15,6 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
-// #include "precision_utils.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
@@ -31,11 +30,12 @@ interval interval_algebra::IntNum(int x)
                     // why should _,16:*:sin have a different output precision than _,15:*:sin ?
                     // shaving a couple extra bits is not worth the later consequences
 
-    while (floor(x * pow(2, -lsb - 1)) == x * pow(2, -lsb - 1) and x != 0) {
+    while (floor(x * pow(2, -lsb - 1)) == x * pow(2, -lsb - 1) && x != 0) {
         lsb++;
-    }*/
-    int lsb = 0;
+    }
+    */
 
+    int lsb = 0;
     return {double(x), double(x), lsb};
 }
 
@@ -48,8 +48,8 @@ interval interval_algebra::Int64Num(int64_t x)
     while (floor(x * pow(2, -lsb - 1)) == x * pow(2, -lsb - 1) and x != 0) {
         lsb++;
     } */
-    int lsb = 0;
 
+    int lsb = 0;
     return {double(x), double(x), lsb};
 }
 }  // namespace itv

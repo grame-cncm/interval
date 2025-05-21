@@ -35,19 +35,18 @@ interval interval_algebra::Asin(const interval& x)
 {
     interval i = intersection(domain, x);
     if (i.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
 
-    double v    = 0;   // value at which the min slope is attained, zero if it is present
-    int    sign = 1;   // whether we compute the difference between f(v) and f(v+ε) or f(v-ε)
-    if (not i.has(0))  // if zero is not present, it's the bound closer to zero
-    {
+    double v    = 0;  // value at which the min slope is attained, zero if it is present
+    int    sign = 1;  // whether we compute the difference between f(v) and f(v+ε) or f(v-ε)
+    if (!i.has(0)) {  // if zero is not present, it's the bound closer to zero
         v    = minValAbs(i);
         sign = signMinValAbs(i);
     }
     int precision = exactPrecisionUnary(asin, v, sign * pow(2, i.lsb()));
 
-    if (precision == INT_MIN or taylor_lsb) {
+    if ((precision == INT_MIN) || taylor_lsb) {
         precision = floor(x.lsb() - (double)log2(1 - v * v) / 2);
     }
 

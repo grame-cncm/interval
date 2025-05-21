@@ -29,7 +29,7 @@ namespace itv {
 interval interval_algebra::Not(const interval& x)
 {
     if (x.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
     int x0 = saturatedIntCast(x.lo());
     int x1 = saturatedIntCast(x.hi());

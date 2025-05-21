@@ -38,7 +38,7 @@ static double myOr(double x, double y)
 interval interval_algebra::Or(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
     int x0 = saturatedIntCast(x.lo());
     int x1 = saturatedIntCast(x.hi());
@@ -51,7 +51,6 @@ interval interval_algebra::Or(const interval& x, const interval& y)
 
     /* int precision = std::max(x.lsb(), y.lsb());  // output precision cannot be finer than that of
     the input intervals
-
 
     // however, if one of the intervals is reduced to one element, the mask can make it so
     int precisionx = 0;

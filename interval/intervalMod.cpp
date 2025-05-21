@@ -59,10 +59,10 @@ interval join(interval x, interval y)
 std::pair<interval, interval> split(interval x)
 {
     if (x.lo() >= 0) {
-        return {interval::empty(), x};
+        return {empty(), x};
     }
     if (x.hi() < 0) {
-        return {x, interval::empty()};
+        return {x, empty()};
     }
     return {interval{x.lo(), nexttoward(0.0, -1.0), x.lsb()}, interval{0.0, x.hi(), x.lsb()}};
 }
@@ -71,10 +71,10 @@ std::pair<interval, interval> split(interval x)
 std::pair<interval, interval> splitnz(interval x)
 {
     if (x.lo() >= 0) {
-        return {interval::empty(), x};
+        return {empty(), x};
     }
     if (x.hi() < 0) {
-        return {x, interval::empty()};
+        return {x, empty()};
     }
     return {interval{x.lo(), nexttoward(0.0, -1.0), x.lsb()},
             interval{nexttoward(0.0, 1.0), x.hi(), x.lsb()}};
@@ -95,10 +95,10 @@ std::pair<interval, interval> splitnz(interval x)
 interval positiveFMod(const interval& x, const interval& y)
 {
     if (x.isEmpty() || y.isEmpty()) {
-        return interval::empty();
+        return empty();
     }
     int n = int(x.lo() / y.hi());
-    std::cout << "n = " << n << std::endl;
+    // std::cout << "n = " << n << std::endl;
     int precision = std::min(x.lsb(), y.lsb());
 
     // n == 0 obeys the same rules as the general case
