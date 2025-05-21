@@ -30,7 +30,7 @@ int main()
     check("interval(0,100,-24)", interval(100.0, 0.0));
     check("interval(0,0,-24)", interval(0, 0));
     check("interval(-10,0,-24)", interval(0, -10));
-    check("interval(-10,10,-5)", interval(-10,10,-5));
+    check("interval(-10,10,-5)", interval(-10, 10, -5));
 
     // test union intersection
 
@@ -86,10 +86,10 @@ int main()
     std::cout << singleton(255) << std::endl;
 
     interval_algebra A;
-    A.testAll();
+    // A.testAll();
     /*A.testExp();
     A.testLog();*/
-    /*A.testAcos(); 
+    /*A.testAcos();
     A.testAcosh();
     A.testAsin();*/
     // A.testAsinh();
@@ -105,7 +105,7 @@ int main()
     // A.testSqrt();
     // A.testTan();
     // A.testTanh();
-    // A.testPow();
+    A.testPow();
     // A.testAdd();
     // A.testMul();
     // A.testSub();
@@ -190,7 +190,7 @@ int main()
     std::cout << "pow(" << X << ", " << Y << ") = " << A.Pow(X, Y) << std::endl << std::endl;
     propagateBackwardsBinaryMethod("pow", &interval_algebra::Pow, X, Y, -24);
     std::cout << std::endl;
-    std::cout << "pow(" << X << ", " << Y << ") = " << A.Pow(X, Y) << std::endl; 
+    std::cout << "pow(" << X << ", " << Y << ") = " << A.Pow(X, Y) << std::endl;
     interval Z = A.Pow(X, Y);
     std::cout << "exp(" << Z << ") = " <<  A.Exp(Z) << std::endl;
     propagateBackwardsUnaryMethod("exp", &interval_algebra::Exp, Z, -24);
