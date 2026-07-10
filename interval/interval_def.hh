@@ -76,27 +76,7 @@ class interval {
         }
     }
 
-    explicit interval(double x) noexcept
-    {
-        if (x == 0) {
-            fLo  = 0;
-            fHi  = 0;
-            fLSB = 0;
-        } else {
-            // compute the preficion needed to represent x
-            // in the form x = 2^p * y, where y is an integer
-            int    p = 0;
-            double y = x;
-            double ipart;
-            while (std::modf(y, &ipart) != 0.0) {
-                y *= 2.0;
-                p--;
-            }
-            fLo  = x;
-            fHi  = x;
-            fLSB = p;
-        }
-    }
+    explicit interval(double n) noexcept : interval(n, n) {}
 
     // interval(const interval& r) : fEmpty(r.empty()), fLo(r.lo()), fHi(r.hi())
     // {}
@@ -237,18 +217,11 @@ inline interval singleton(double x)
     }
     */
 
-    // int m = std::floor(std::log2(std::abs(x)));
+    int m = std::floor(std::log2(std::abs(x)));
 
-    // int precision = m - 32;  // 32 = set width
+    int precision = m - 32;  // 32 = set width
 
-    int    p = 0;
-    double y = x;
-    double ipart;
-    while (std::modf(y, &ipart) != 0.0) {
-        y *= 2.0;
-        p--;
-    }
-    return {x, x, p};
+    return {x, x, precision};
 }
 
 //-------------------------------------------------------------------------
