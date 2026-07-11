@@ -16,7 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: create cmake project
-      run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+      run: cmake -S . -B build -A x64
     - name: build project
       run: cmake --build build --config Debug
     - name: execute tests
