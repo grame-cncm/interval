@@ -49,6 +49,14 @@ int main()
     checkExact("absolute value", algebra.Abs(interval(-2, 3)), interval(0, 3));
     checkExact("minimum", algebra.Min(interval(-2, 3), interval(1, 5)), interval(-2, 3));
     checkExact("maximum", algebra.Max(interval(-2, 3), interval(1, 5)), interval(1, 5));
+    checkExact("integer power without wrapping", algebra.Pow(interval(2, 3, 0), interval(2, 2, 0)),
+               interval(4, 9, 2));
+    checkExact("integer power with possible wrapping",
+               algebra.Pow(interval(60, 62, 0), interval(8, 106, 0)),
+               interval(static_cast<double>(INT32_MIN), static_cast<double>(INT32_MAX), 0));
+    checkExact("fixed integer exponent preserves sufficient precision",
+               algebra.Pow(interval(-0.375, -0.34375, -5), interval(2, 2, 0)),
+               interval(0.1181640625, 0.140625, -6));
 
     return reportCheckResults();
 }

@@ -21,6 +21,13 @@ file(GLOB INTERVAL_SOURCES CONFIGURE_DEPENDS interval/*.cpp)
 add_library(interval STATIC ${INTERVAL_SOURCES})
 target_include_directories(interval PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/FaustAlgebra)
 
+# The interval algebra models signed 32-bit integer overflow as two's-complement
+# wrapping. GCC and Clang must compile the corresponding signed arithmetic with
+# that same contract.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(interval PUBLIC -fwrapv)
+endif()
+
 # Experimental and numerical analysis executable.
 add_executable(TestInterval main.cpp)
 target_link_libraries(TestInterval PRIVATE interval)

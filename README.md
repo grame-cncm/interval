@@ -30,6 +30,12 @@ An interval represent integer values if lo and hi are integers and if lsb >= 0
 - `interval(-HUGE_VAL, HUGE_VAL)` also contains infinities and is therefore distinct from
   `fullFinite()`.
 
+## Integer overflow semantics
+
+Integer interval operations model signed 32-bit arithmetic with two's-complement wrapping.
+Generated C/C++ programs must be compiled with `-fwrapv` when using GCC or Clang. The option
+must apply to the generated program itself, not only to the Faust compiler.
+
 ## Organization of the code
 
 All the code is encapsulated in the namespace 'itv'. It is organized as follows:
@@ -37,4 +43,3 @@ All the code is encapsulated in the namespace 'itv'. It is organized as follows:
 - interval_def.hh : defines intervals as data structures with some very basic methods to access the fields
 - interval_algebra.hh/cpp: class gathering all operations on intervals as defined by Faust primitives.
 - intervalXXX.cpp: implementation of the XXX operation on intervals.
-
