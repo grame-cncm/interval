@@ -13,7 +13,9 @@
  * limitations under the License.
  */
 #include <algorithm>
+#include <cmath>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 
@@ -26,21 +28,25 @@ using namespace itv;
 int main()
 {
     // test interval representation
-    // check("interval()", interval());
     check("interval(0,100,-24)", interval(100.0, 0.0));
     check("interval(0,0,0)", interval(0, 0));
     check("interval(-10,0,-24)", interval(0, -10));
     check("interval(-10,10,-5)", interval(-10, 10, -5));
+    check("default interval is fullFinite", interval(), fullFinite());
+    check("fullFinite is not empty", false, fullFinite().isEmpty());
+    check("fullFinite contains the largest finite double", true,
+          fullFinite().has(std::numeric_limits<double>::max()));
+    check("fullFinite excludes positive infinity", false, fullFinite().has(HUGE_VAL));
 
     // test union intersection
 
     check("test2", intersection(interval(0, 100), interval(-10, 0)), interval(0));
-    check("test3", intersection(interval(10, 100), interval(-10, 0)), interval());
+    check("test3", intersection(interval(10, 100), interval(-10, 0)), empty());
     check("test4", reunion(interval(0, 100), interval(-100, 50)), interval(-100, 100));
     check("test5", reunion(interval(0, 100), interval(10, 500)), interval(0, 500));
 
     // test predicates
-    interval a(1, 100), b(10, 20), c(-10, 0), n;
+    interval a(1, 100), b(10, 20), c(-10, 0), n = empty();
 
     std::cout << a << " == " << b << " = " << (a == b) << std::endl;
     std::cout << a << " <= " << b << " = " << (a <= b) << std::endl;
@@ -239,4 +245,5 @@ int main()
     /* interval X = interval(0.5,96000,-65);
     interval Y = interval(23.4489,23.4489,-958);
     std::cout << X << "/" << Y << " = " << A.Div(X, Y) << std::endl;*/
+    return reportCheckResults();
 }

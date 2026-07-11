@@ -184,7 +184,7 @@ class interval {
 inline std::ostream& operator<<(std::ostream& dst, const interval& i)
 {
     if (i.isEmpty()) {
-        return dst << "interval()";
+        return dst << "empty()";
     } else {
         return dst << "interval(" << i.lo() << ',' << i.hi() << ',' << i.lsb() << ")";
     }
@@ -197,6 +197,17 @@ inline std::ostream& operator<<(std::ostream& dst, const interval& i)
 inline interval empty() noexcept
 {
     return {NAN, NAN, 0};
+}
+
+/**
+ * Return the interval containing every finite value representable by a double.
+ *
+ * This is the explicit equivalent of the historical default constructor. It
+ * does not contain positive or negative infinity.
+ */
+inline interval fullFinite(int lsb = -24) noexcept
+{
+    return {std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max(), lsb};
 }
 
 inline interval intersection(const interval& i, const interval& j)

@@ -19,5 +19,5 @@ jobs:
       run: cmake -DNOTIDY=ON -B build -S .
     - name: build cmake project
       run: cmake --build build/ --target all
-    - name: execute test
-      run: ./build/TestInterval
+    - name: execute tests
+      run: ctest --test-dir build --output-on-failure

@@ -21,6 +21,15 @@ An interval is a triplet <lo,hi,lsb> where:
 
 An interval represent integer values if lo and hi are integers and if lsb >= 0
 
+## Special intervals
+
+- `interval()` is the historical default interval. It contains every finite value
+  representable by a `double` and has an LSB of `-24`.
+- `fullFinite()` constructs the same interval explicitly, optionally with a different LSB.
+- `empty()` constructs the empty interval, represented internally with `NaN` bounds.
+- `interval(-HUGE_VAL, HUGE_VAL)` also contains infinities and is therefore distinct from
+  `fullFinite()`.
+
 ## Organization of the code
 
 All the code is encapsulated in the namespace 'itv'. It is organized as follows:
@@ -28,5 +37,4 @@ All the code is encapsulated in the namespace 'itv'. It is organized as follows:
 - interval_def.hh : defines intervals as data structures with some very basic methods to access the fields
 - interval_algebra.hh/cpp: class gathering all operations on intervals as defined by Faust primitives.
 - intervalXXX.cpp: implementation of the XXX operation on intervals.
-
 
