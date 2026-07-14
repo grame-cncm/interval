@@ -37,10 +37,16 @@ class FaustAlgebra {
     virtual T Checkbox(const T& name)                                                         = 0;
     virtual T VSlider(const T& name, const T& init, const T& lo, const T& hi, const T& step)  = 0;
     virtual T HSlider(const T& name, const T& init, const T& lo, const T& hi, const T& step)  = 0;
-    virtual T HBargraph(const T& name, const T& lo, const T& hi)                              = 0;
-    virtual T VBargraph(const T& name, const T& lo, const T& hi)                              = 0;
+    // Bargraphs are signal nodes, so the displayed signal must participate in
+    // every interpretation rather than being supplied by an implicit caller.
+    virtual T HBargraph(const T& name, const T& lo, const T& hi, const T& signal)             = 0;
+    virtual T VBargraph(const T& name, const T& lo, const T& hi, const T& signal)             = 0;
     virtual T NumEntry(const T& name, const T& init, const T& lo, const T& hi, const T& step) = 0;
+    // Effect and control wrappers expose both dependencies even when an
+    // interpretation ultimately preserves the value carried by x.
     virtual T Attach(const T& x, const T& y)                                                  = 0;
+    virtual T Enable(const T& x, const T& control)                                            = 0;
+    virtual T Control(const T& x, const T& control)                                           = 0;
 
     // Numerical Operations
     virtual T Abs(const T& x)                             = 0;
@@ -66,6 +72,7 @@ class FaustAlgebra {
     virtual T Cosh(const T& x)                            = 0;
     virtual T Eq(const T& x, const T& y)                  = 0;
     virtual T Exp(const T& x)                             = 0;
+    virtual T Exp10(const T& x)                           = 0;
     virtual T FloatCast(const T& x)                       = 0;
     virtual T BitCast(const T& x)                         = 0;
     virtual T Floor(const T& x)                           = 0;
@@ -83,10 +90,14 @@ class FaustAlgebra {
     virtual T Not(const T& x)                             = 0;
     virtual T Or(const T& x, const T& y)                  = 0;
     virtual T Pow(const T& x, const T& y)                 = 0;
-    virtual T Remainder(const T& x)                       = 0;
+    // IEEE remainder is binary; the previous unary signature lost its divisor.
+    virtual T Remainder(const T& x, const T& y)           = 0;
     virtual T Rint(const T& x)                            = 0;
     virtual T Round(const T& x)                           = 0;
-    virtual T Rsh(const T& x, const T& y)                 = 0;
+    // Signed and logical right shifts have different semantics for negative
+    // operands and therefore cannot share one algebra operation.
+    virtual T ARsh(const T& x, const T& y)                = 0;
+    virtual T LRsh(const T& x, const T& y)                = 0;
     virtual T Select2(const T& x, const T& y, const T& z) = 0;
     virtual T Sin(const T& x)                             = 0;
     virtual T Sinh(const T& x)                            = 0;
@@ -99,6 +110,9 @@ class FaustAlgebra {
     virtual T Mem(const T& x)                                                  = 0;
     virtual T Delay(const T& x, const T& y)                                    = 0;
     virtual T Prefix(const T& x, const T& y)                                   = 0;
+    // Bounds refine numeric values but must still be visible to analyses that
+    // validate their constancy and ordering.
+    virtual T AssertBounds(const T& lo, const T& hi, const T& x)                = 0;
     virtual T RDTbl(const T& wtbl, const T& ri)                                = 0;
     virtual T WRTbl(const T& n, const T& g, const T& wi, const T& ws)          = 0;
     virtual T Gen(const T& x)                                                  = 0;
