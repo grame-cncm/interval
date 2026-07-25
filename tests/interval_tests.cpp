@@ -4,6 +4,8 @@
 
 #include "interval/check.hh"
 #include "interval/interval_algebra.hh"
+#include "interval/affine_ops.hh"
+#include "interval/affint.hh"
 #include "interval/interval_def.hh"
 
 using namespace itv;
@@ -57,6 +59,43 @@ int main()
     checkExact("fixed integer exponent preserves sufficient precision",
                algebra.Pow(interval(-0.375, -0.34375, -5), interval(2, 2, 0)),
                interval(0.1181640625, 0.140625, -6));
+
+
+    // ---- affine-in-time intervals -----------------------------------------------------
+    {
+        const double    T = 1000;
+        affine_algebra  aa(T);
+
+        // the rate-0 subdomain embeds the ordinary intervals
+        const AffItv c = fromItv(interval(-2, 3, -8));
+        checkExact("affine: rate-0 round-trip", toItv(c, T), interval(-2, 3, -8));
+
+        // the counter x = x@1 + 1 is STATIONARY at rate 1: 1 + delay(x) == x
+        const AffItv x  = {0, 0, 9, 1, 0};  // lo(t) = 0, hi(t) = 9 + t
+        const AffItv x2 = aa.Add(aa.IntNum(1), aa.Mem(x));
+        check("affine: counter stationary (hi intercept)", true, x2.b0 == x.b0 && x2.b1 == x.b1);
+        check("affine: counter stationary (lo)", true, x2.a0 >= 0 && x2.a1 == 0);
+
+        // mod of a climbing corridor is a HORIZONTAL band -- the hull of the sawtooth
+        const AffItv m = aa.Mod(x, fromItv(interval(2000, 2000, 0)));
+        check("affine: mod kills the rate", true, m.isConst());
+        check("affine: mod band is [0, 2000)", true, m.a0 >= 0 && m.b0 < 2000);
+
+        // widening proposes the observed per-round rate, then escalates
+        const AffItv w1 = awiden({0, 0, 8, 0, 0}, {0, 0, 9, 0, 0}, T);
+        check("affine: widening proposes the rate", true, w1.b1 == 1 && w1.b0 == 9);
+        const AffItv w2 = awiden({0, 0, 9, 1, 0}, {0, 0, 20, 1, 0}, T);
+        check("affine: super-linear escalates to the int top", true,
+              w2.b0 == 2147483647.0 && w2.b1 == 0);
+
+        // the collapse caps an integer chain past its wrap date
+        checkExact("affine: int32 cap at the bridge", toItv({0, 0, 10, 3e6, 0}, T),
+                   interval(-2147483648.0, 2147483647.0, 0));
+
+        // foreign entities are fullFinite (sound near-top), not empty
+        check("affine: foreign is not neutral", false,
+              aa.ForeignConst(0, aempty(), aempty()).isEmpty());
+    }
 
     return reportCheckResults();
 }
