@@ -455,9 +455,16 @@ The `intervalMissing.cpp` file implement placeholders for primitives that have n
 
 ## Mod
 
-Mod is the modulo operator. 
+Mod is the modulo operator.
 
-It is implemented using C++ function `std::fmod`, which has the property that $\mathrm{fmod}(x, y) = x - y \cdot \lfloor \frac{x}{y} \rfloor$. 
+*Integer path (July 2026):* when both operands are integers (`lsb >= 0`), Mod follows
+the C semantics of `%` instead of the `fmod` analysis below: the result has the sign
+of $x$, its magnitude is at most $\min(\overline{|x|}, m-1)$ where $m$ is the largest
+divisor magnitude, and $x \bmod y = x$ whenever $|x|$ provably stays below the
+smallest nonzero divisor magnitude. This is one whole unit tighter than the `fmod`
+bound: $[0; y[$ closes at $y$ for reals, but at $y-1$ for integers.
+
+The float path is implemented using C++ function `std::fmod`, which has the property that $\mathrm{fmod}(x, y) = x - y \cdot \lfloor \frac{x}{y} \rfloor$. 
 The value $\lfloor \frac{x}{y}\rfloor$ will be called the quotient of $x$ by $y$.
 
 Let's denote the input intervals $X = [\underline{x}; \overline{x}]$ for the dividend and $Y =[\underline{y}; \overline{y}]$ for the divisor.

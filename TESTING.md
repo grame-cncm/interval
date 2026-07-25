@@ -24,6 +24,11 @@ kept for exploratory numerical analyses.
 Sampled analyses use fixed seeds so a failure can be reproduced. They remain complements to,
 not replacements for, deterministic boundary and regression tests.
 
+The regression suite (`tests/interval_tests.cpp`) covers both layers: the ordinary
+interval algebra (including the integer paths of Add and Mod) and the affine-in-time
+layer (`affine_algebra`: rate lifecycle, delays, joins, widening, the int32 cap at the
+`toItv` bridge).
+
 # Testing functions
 
 How the various test functions work.

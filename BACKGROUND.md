@@ -1,4 +1,15 @@
-The `interval` library is being developed in the context of the FAST project, which aims at porting the Faust language to FPGA. 
+The `interval` library was initially developed in the context of the FAST project,
+which aims at porting the Faust language to FPGA. The fixed-point precision material
+below (msb/lsb formats, pseudo-injectivity, forward and backward propagation) comes
+from that work and remains the reference for the `lsb` field carried by every
+interval.
+
+*Update, July 2026:* the library has since become the interval domain of the Faust
+compiler's type system itself — every signal range is produced by a fixpoint over
+`interval_algebra` — and was extended with affine-in-time intervals (`affint.hh`,
+`affine_ops.hh`) that date a program's failure modes (int32 wrap, float absorption)
+instead of merely bounding its values. The fixed-point role described here is
+unchanged: it is one of the two roles of the computation (see README.md).
 
 # Faust on FPGAs
 
