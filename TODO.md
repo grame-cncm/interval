@@ -68,9 +68,12 @@ de chevauchement de frontière, wrap cohérent si entièrement au-delà, exact s
 IntCast/Min/Max/ARsh conformes ; corrigés : Abs (INT_MIN restait atteignable —
 abs(INT_MIN) wrappe), Lsh (le facteur 2^k au lsb flottant court-circuitait
 l'élargissement entier de Mul), LRsh (k pouvant être 0 laisse passer l'opérande
-négatif ; borne 2^(32−k)−1 au lieu de +inf). Question de PLATEFORME restée ouverte :
-IntCast modélise la saturation (ARM) alors que x86 (cvttsd2si) produit INT_MIN pour
-tout hors-plage — trancher quelle sémantique le compilateur garantit.
+négatif ; borne 2^(32−k)−1 au lieu de +inf). La question de plateforme (saturation
+ARM vs INT_MIN x86 pour un cast hors-plage) est RÉSOLUE sans choix (2026-07) : le
+compilateur émettant un cast nu, IntCast modélise l'UNION des deux comportements —
+plage int32 pleine dès qu'un dépassement est possible. Si un jour on veut la
+portabilité des VALEURS (même sortie sur toute plateforme), c'est une décision de
+codegen (cast clampé, éventuellement derrière une option) — chantier séparé.
 
 # Couche affine
 
