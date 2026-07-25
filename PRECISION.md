@@ -35,14 +35,14 @@ abs is a function that is equal to the identity function on positive values and 
 
 ### Integers
 
-When applied to integers, Abs is implemented using the `std::abs` C++ function. 
+When applied to integers, Abs is implemented using the `std::abs` C++ function.
 This function has undefined behaviour when applied to `INT_MIN`, since `-INT_MIN = INT_MAX + 1` is not representable.
-We chose to interpret this fact as the indication that `INT_MIN` is out of bounds for Abs. 
-We deal with it the same way we deal with other domain violations: 
-we restrict the input interval to legal values and apply Abs to the restricted interval.
 
-
-**TODO**: Modifications will have to be made to the code generator as well to warn about domain violations.
+*Updated (July 2026), computational semantics:* in practice the generated code wraps
+and `abs(INT_MIN)` is `INT_MIN` again, so an input interval containing `INT_MIN`
+yields the full integer range `[INT_MIN; INT_MAX]` — both ends are reachable. The
+earlier interpretation (treat `INT_MIN` as a domain violation and restrict the input)
+described a bound that excluded an achievable value.
 
 ## Acos 
 
