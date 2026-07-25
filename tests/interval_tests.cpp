@@ -81,6 +81,15 @@ int main()
         check("affine: mod kills the rate", true, m.isConst());
         check("affine: mod band is [0, 2000)", true, m.a0 >= 0 && m.b0 < 2000);
 
+        // the INTEGER path of Mod (C semantics : sign of x, magnitude < |y|)
+        itv::interval_algebra ia;
+        checkExact("integer mod is [0, n-1]", ia.Mod(interval(1, 192000, 0), interval(2, 2, 0)),
+                   interval(0, 1, 0));
+        checkExact("integer mod follows x's sign",
+                   ia.Mod(interval(-10, 10, 0), interval(3, 3, 0)), interval(-2, 2, 0));
+        checkExact("integer mod keeps a small x",
+                   ia.Mod(interval(3, 5, 0), interval(7, 7, 0)), interval(3, 5, 0));
+
         // widening proposes the observed per-round rate, then escalates
         const AffItv w1 = awiden({0, 0, 8, 0, 0}, {0, 0, 9, 0, 0}, T);
         check("affine: widening proposes the rate", true, w1.b1 == 1 && w1.b0 == 9);
