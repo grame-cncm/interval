@@ -47,10 +47,11 @@ A reprendre du reliquat de texte à la fin.
 
 ## Rem
 
-Refaire le meme raisonnement que pour Mod, en prenant en compte les changements dûs à tie to even.
-**Note 2026:** Mod a maintenant un chemin ENTIER (sémantique C : signe de x, magnitude
-< |y|, identité si |x| < mmin) — voir README et PRECISION.md ; Rem n'a pas encore
-d'équivalent.
+**Fait (2026-07):** Remainder (IEEE, quotient ties-to-even) n'est plus un placeholder :
+résultat dans [−|y|/2, +|y|/2], magnitude bornée par |x|, identité quand |x| < mmin/2.
+Reste ouvert : l'analyse de PRÉCISION fine (le raisonnement pseudo-injectivité de Mod
+adapté au tie-to-even) — la borne actuelle est exacte sur les bornes, standard sur le
+lsb (min des deux).
 
 ## Fonctions trigonométriques et hyperboliques
 
@@ -58,13 +59,18 @@ Cos, Sin, Tan, Sinh, Tanh: Refaire le raisonnement des Taylor fallback.
 
 ## Neg et sub
 
-Prendre en compte le wrapping sur le meme principe que pour Add (`-INT_MIN > INT_MAX`).
-**Toujours ouvert (2026)** : ni `intervalNeg.cpp` ni `intervalSub.cpp` n'ont de
-branche entière avec wrap.
+**Fait (2026-07)** : branches entières en miroir de l'idiome d'Add — plein int32 en cas
+de chevauchement de frontière, wrap cohérent si entièrement au-delà, exact sinon.
 
-## Probablement d'autres fonctions
+## Passe générale de conformité computationnelle
 
-Faire une passe sur toutes les primitives pour vérifier que tout est en ordre.
+**Faite (2026-07)** sur les opérations entières : Add/Sub/Neg/Mod/Mul/Pow(iPow)/
+IntCast/Min/Max/ARsh conformes ; corrigés : Abs (INT_MIN restait atteignable —
+abs(INT_MIN) wrappe), Lsh (le facteur 2^k au lsb flottant court-circuitait
+l'élargissement entier de Mul), LRsh (k pouvant être 0 laisse passer l'opérande
+négatif ; borne 2^(32−k)−1 au lieu de +inf). Question de PLATEFORME restée ouverte :
+IntCast modélise la saturation (ARM) alors que x86 (cvttsd2si) produit INT_MIN pour
+tout hors-plage — trancher quelle sémantique le compilateur garantit.
 
 # Couche affine
 

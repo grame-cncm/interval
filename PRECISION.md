@@ -617,6 +617,13 @@ The finest precision is attained at the lower bound $\underline{x}$ of the inter
 Rem is the function giving the remainder of the floating-point division. 
 It is defined as $\mathrm{rem}(x, y) = x - \lfloor \frac{x}{y} \rceil \cdot y$, where $\lfloor \frac{x}{y} \rceil$ is the closest integer to $\frac{x}{y}$ (chosed to be an even number if $\frac{x}{y}$ is exactly halfway between two integers).
 
+*Implementation note (July 2026):* the bounds are implemented directly from the
+definition: the result lies in $[-|y|/2, +|y|/2]$ (both ends achievable at exact
+half-quotients), its magnitude never exceeds $|x|$, and $\mathrm{rem}(x, y) = x$
+whenever $|x|$ provably stays below half the smallest nonzero divisor magnitude. The
+fine PRECISION analysis below (pseudo-injectivity with the tie-to-even quotient)
+remains to be completed.
+
 The reasoning is very similar as the one for Mod.
 
 The discontinuities are lines of equation

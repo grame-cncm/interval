@@ -107,6 +107,24 @@ int main()
                    ia.Sub(interval(IMIN, IMIN, 0), interval(1, 1, 0)),
                    interval(IMAX, IMAX, 0));
 
+        // the general conformity pass : Abs, Lsh, LRsh, Remainder
+        checkExact("integer abs containing INT_MIN reaches both ends",
+                   ia.Abs(interval(IMIN, 5, 0)), interval(IMIN, IMAX, 0));
+        checkExact("integer lsh overflowing widens to full int32",
+                   ia.Lsh(interval(1, 1, 0), interval(31, 31, 0)),
+                   interval(IMIN, IMAX, 0 + 31));
+        checkExact("logical rsh of a negative by k>=1 is bounded",
+                   ia.LRsh(interval(-8, -8, 0), interval(1, 1, 0)),
+                   interval(0, IMAX, 0));
+        checkExact("logical rsh by a possible 0 keeps the negatives reachable",
+                   ia.LRsh(interval(-8, -8, 0), interval(0, 1, 0)),
+                   interval(IMIN, IMAX, 0));
+        checkExact("remainder band", ia.Remainder(interval(0, 100, 0), interval(2, 2, 0)),
+                   interval(-1, 1, 0));
+        checkExact("remainder identity below half the divisor",
+                   ia.Remainder(interval(3, 3, 0), interval(8, 8, 0)),
+                   interval(3, 3, 0));
+
         // widening proposes the observed per-round rate, then escalates
         const AffItv w1 = awiden({0, 0, 8, 0, 0}, {0, 0, 9, 0, 0}, T);
         check("affine: widening proposes the rate", true, w1.b1 == 1 && w1.b0 == 9);
