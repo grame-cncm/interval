@@ -56,9 +56,9 @@ inline int& programPrecision()
  * is monotone : for a monotone operation, the bound computed in double then rounded
  * is the value the program computes at that bound (the sum and the product of two
  * floats are exact in double). Round to nearest, not outward : a constant stays a
- * point. An integer bound beyond 2^24 is left as it is (an integer value may carry a
- * float precision by default) ; the margin of the float-to-int conversion covers it. A
- * nonzero bound below the smallest normal float is left as it is.
+ * point. Left as they are : an integer bound beyond 2^24 (an integer value may carry a
+ * float precision by default) and a nonzero bound below the smallest normal float (its
+ * rounding to 0 would break the invariants of pow and log).
  */
 inline double programBound(double b)
 {
