@@ -1,5 +1,6 @@
 #include <cmath>
 #include <limits>
+#include <random>
 #include <sstream>
 
 #include "interval/check.hh"
@@ -143,6 +144,59 @@ int main()
         // foreign entities are fullFinite (sound near-top), not empty
         check("affine: foreign is not neutral", false,
               aa.ForeignConst(0, aempty(), aempty()).isEmpty());
+    }
+
+    // ---- the precision of the program (programPrecision, programBound, ulpMargin) ----
+    {
+        interval_algebra algebra;
+        const int        saved = programPrecision();
+        check("the library is neutral by default", true, saved == 0);
+
+        // neutral : the bounds stay doubles, nothing is rounded
+        programPrecision() = 0;
+        check("neutral: 0.1 stays the double 0.1", true, interval(0.1).lo() == 0.1);
+        check("neutral: a bound between two floats is kept", true,
+              interval(0, 99.99999999).hi() == 99.99999999);
+
+        // single precision : the bounds of a float-carried value are floats
+        programPrecision() = 1;
+        check("single: 0.1 is the float 0.1f", true, interval(0.1).lo() == double(0.1f));
+        check("single: a constant stays a point", true,
+              algebra.Add(interval(0.1), interval(0.2)).isconst());
+        check("single: 0.1 + 0.2 is the float sum the program computes", true,
+              algebra.Add(interval(0.1), interval(0.2)).lo() == double(0.1f + 0.2f));
+        check("single: a bound between two floats rounds to the nearest float", true,
+              interval(0, 99.99999999).hi() == 100.0);
+        check("single: an integer interval (lsb >= 0) is not rounded", true,
+              interval(0, 16777217.0, 0).hi() == 16777217.0);
+        check("single: an integer bound beyond 2^24 is kept", true,
+              interval(0, 16777217.0).hi() == 16777217.0);
+        check("single: a tiny positive bound stays positive", true, interval(1e-300, 1).lo() > 0);
+        check("single: ulpMargin is k float ulps at the magnitude", true,
+              ulpMargin(0, 100, 4) == 4 * 0x1p-23 * 100);
+
+        // the float sums and products of the program stay in their intervals (fixed seed)
+        {
+            interval X(-3.7, 12.1), Y(0.003, 99.99);
+            interval S = algebra.Add(X, Y), P = algebra.Mul(X, Y);
+            std::mt19937                          gen(42);
+            std::uniform_real_distribution<float> dx(float(X.lo()), float(X.hi()));
+            std::uniform_real_distribution<float> dy(float(Y.lo()), float(Y.hi()));
+            bool ok = S.has(float(X.hi()) + float(Y.hi())) && P.has(float(X.hi()) * float(Y.hi()));
+            for (int i = 0; i < 100000 && ok; i++) {
+                float a = dx(gen), b = dy(gen);
+                ok      = S.has(a + b) && P.has(a * b);
+            }
+            check("single: the float sums and products stay in their intervals", true, ok);
+        }
+
+        // double precision : nothing to round, the bounds are already doubles
+        programPrecision() = 2;
+        check("double: 0.1 stays the double 0.1", true, interval(0.1).lo() == 0.1);
+        check("double: ulpMargin is k double ulps at the magnitude", true,
+              ulpMargin(0, 100, 4) == 4 * 0x1p-52 * 100);
+
+        programPrecision() = saved;
     }
 
     return reportCheckResults();

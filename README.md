@@ -49,6 +49,23 @@ range:
   nonzero divisor magnitude. The float path models `fmod`, whose bound closes at
   `|y|`.
 
+- **Floating-point operations** follow the precision of the program, which its user
+  declares with `itv::programPrecision()`: 0 by default (neutral: nothing is rounded,
+  the bounds stay doubles, as the library always did), 1 single, 2 double, 3 quad,
+  4 fixed point. The Faust compiler declares it from `-single`, `-double`, `-quad`.
+  In single precision, every bound of a float-carried interval (`lsb < 0`) is rounded
+  to the nearest float when the interval is built (`programBound`). Round to nearest
+  is monotone, and the sum and the product of two floats are exact in double: an
+  elementary operation gives the very bound the program computes, and a constant stays
+  a point (`0.1 + 0.2` is the float `0.3f`). Not rounded: the integer bounds beyond
+  2^24 (an integer value may carry a float precision by default) and the nonzero bounds
+  below the smallest normal float (their rounding to 0 would break the invariants of
+  `pow` and `log`). Approximate, within an ulp: the division, the square root and the
+  mathematical functions (a double rounding, the error of the C library). The rules
+  that reason on reals (the hull of a convex combination, where `(1 - t)*m + t*m` is
+  `100.0` in float for `m = 99.9999924`) add `ulpMargin(lo, hi, k)`, k ulps of the
+  program's precision at the magnitude of the bounds.
+
 ## Special intervals
 
 - `interval()` is the historical default interval. It contains every finite value
