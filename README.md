@@ -49,24 +49,36 @@ range:
   nonzero divisor magnitude. The float path models `fmod`, whose bound closes at
   `|y|`.
 
-- **Floating-point operations** follow the precision of the program, which its user
-  declares with `itv::programPrecision()`: 0 by default (neutral: nothing is rounded,
-  the bounds stay doubles, as the library always did), 1 single, 2 double, 3 quad,
-  4 fixed point. The Faust compiler declares it from `-single`, `-double`, `-quad`.
-  In single precision, every bound of a float-carried interval (`lsb < 0`) is rounded
-  to the nearest float when the interval is built (`programBound`). Round to nearest
-  is monotone, and for `+`, `-`, `*`, `/` and `sqrt` of floats the double rounding is
-  innocuous (53 >= 2×24 + 2: rounding in double, then in float, gives the float the
-  program computes, even when the double result is not exact): an elementary
-  operation gives the very bound the program computes, and a constant stays a point
-  (`0.1 + 0.2` is the float `0.3f`). Not rounded: the integer bounds beyond 2^24 (an
-  integer value may carry a float precision by default) and the nonzero bounds below
-  the smallest normal float (their rounding to 0 would break the invariants of `pow`
-  and `log`). Not covered by the bounds: the FMA contraction and the reassociation of
-  the C++ compiler, and the mathematical functions of the C library, which are not
-  correctly rounded; the decisions that read the intervals keep a margin for those
-  (the compiler keeps the guard of a table access whose index is within 4 ulps of an
-  edge). The rules that reason on reals (the hull of a convex combination, where
+- **Floating-point operations** follow two settings of the user:
+  - `itv::programPrecision()`, the precision of the program: 2 double by default,
+    1 single, 3 quad, 4 fixed point. The Faust compiler declares it from `-single`,
+    `-double`, `-quad`. In single precision, every bound of a float-carried interval
+    (`lsb < 0`) is rounded to the nearest float when the interval is built
+    (`programBound`). Round to nearest is monotone, and for `+`, `-`, `*`, `/` and
+    `sqrt` of floats the double rounding is innocuous (53 >= 2×24 + 2: rounding in
+    double, then in float, gives the float the program computes, even when the double
+    result is not exact): an elementary operation gives the very bound the program
+    computes, and a constant stays a point (`0.1 + 0.2` is the float `0.3f`). Not
+    rounded: the integer bounds beyond 2^24 (an integer value may carry a float
+    precision by default) and the nonzero bounds below the smallest normal float
+    (their rounding to 0 would break the invariants of `pow` and `log`).
+  - `itv::libmCompensation()`, true by default. IEEE 754 requires a correct rounding
+    of `+`, `-`, `*`, `/` and `sqrt` only: the functions of the libm (`sin`, `cos`,
+    `tan`, the inverse and hyperbolic functions, `exp`, `log`, `log10`, `pow`) may be
+    off by an ulp (macOS: `sinf(1.00000596f)` is one ulp above `(float)sin(1.00000596)`),
+    and the program calls the libm of its target, not the libm of the machine that
+    computes the intervals. Their bounds widen by 2 ulps of the program's precision
+    (`libmBounds`), within the image of the function (`sin` stays in `[-1, 1]`, `exp`
+    stays `>= 0`), never for a point (a function of a constant is folded at compile
+    time), an exact 0 (the C standard makes the libm exact there, annex F) or an
+    integer result. Turn it off only when both libms are correctly rounded (CORE-MATH
+    for instance): the libm of the target and the libm of the machine that computes the
+    intervals.
+
+  Not covered by the bounds: the FMA contraction and the reassociation of the C++
+  compiler. The decisions that read the intervals keep a margin for those: the
+  compiler keeps the guard of a table access whose index is within 4 ulps of an edge.
+  The rules that reason on reals (the hull of a convex combination, where
   `(1 - t)*m + t*m` is `100.0` in float for `m = 99.9999924`) add
   `ulpMargin(lo, hi, k)`, k ulps of the program's precision at the magnitude of the
   bounds.

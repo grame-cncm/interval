@@ -13,6 +13,10 @@ using namespace itv;
 
 int main()
 {
+    // the defaults, read before any test changes them
+    check("the program is in double precision by default", true, programPrecision() == 2);
+    check("the libm is compensated by default", true, libmCompensation());
+
     const interval all = fullFinite();
     const interval nil = empty();
 
@@ -57,9 +61,12 @@ int main()
     checkExact("integer power with possible wrapping",
                algebra.Pow(interval(60, 62, 0), interval(8, 106, 0)),
                interval(static_cast<double>(INT32_MIN), static_cast<double>(INT32_MAX), 0));
+    // the raw bounds of the algebra : the compensation of the libm is turned off here
+    libmCompensation() = false;
     checkExact("fixed integer exponent preserves sufficient precision",
                algebra.Pow(interval(-0.375, -0.34375, -5), interval(2, 2, 0)),
                interval(0.1181640625, 0.140625, -6));
+    libmCompensation() = true;
 
 
     // ---- affine-in-time intervals -----------------------------------------------------
@@ -150,12 +157,10 @@ int main()
     {
         interval_algebra algebra;
         const int        saved = programPrecision();
-        check("the library is neutral by default", true, saved == 0);
 
-        // neutral : the bounds stay doubles, nothing is rounded
-        programPrecision() = 0;
-        check("neutral: 0.1 stays the double 0.1", true, interval(0.1).lo() == 0.1);
-        check("neutral: a bound between two floats is kept", true,
+        // double precision : the bounds stay doubles, nothing is rounded
+        check("double: 0.1 stays the double 0.1", true, interval(0.1).lo() == 0.1);
+        check("double: a bound between two floats is kept", true,
               interval(0, 99.99999999).hi() == 99.99999999);
 
         // single precision : the bounds of a float-carried value are floats
@@ -195,6 +200,37 @@ int main()
         check("double: 0.1 stays the double 0.1", true, interval(0.1).lo() == 0.1);
         check("double: ulpMargin is k double ulps at the magnitude", true,
               ulpMargin(0, 100, 4) == 4 * 0x1p-52 * 100);
+
+        // the compensation of the libm : 2 ulps outward, within the image of the function,
+        // never for a point, an exact 0 or an integer result
+        {
+            programPrecision() = 1;
+            interval x(0, 1.00000596);
+            interval s = algebra.Sin(x);
+            libmCompensation() = false;
+            interval raw = algebra.Sin(x);
+            libmCompensation() = true;
+            float  up2 = std::nextafter(std::nextafter(float(raw.hi()), 2.0f), 2.0f);
+            check("libm: sin widens its upper bound by 2 float ulps", true, s.hi() == double(up2));
+            check("libm: sin keeps its exact 0 bound", true, s.lo() == 0);
+            check("libm: the image of sin caps the widening", true,
+                  algebra.Sin(interval(0, 7)).hi() == 1 && algebra.Sin(interval(0, 7)).lo() == -1);
+            check("libm: a constant stays a point", true, algebra.Sin(interval(0.5)).isconst());
+            check("libm: exp stays >= 0", true, algebra.Exp(interval(-200, 0)).lo() >= 0);
+            // the witness : 118.83905 * sinf(1.00000596) is 100.0 in float, one ulp above the
+            // bound computed with sin in double ; the compensated bound covers it
+            // volatile : a sinf of a constant would be folded by the C++ compiler, with a
+            // correct rounding, instead of calling the libm
+            volatile float vx   = 1.00000596f;
+            float          prog = 118.83905f * std::sin(float(vx));
+            interval p = algebra.Mul(interval(118.83905), algebra.Sin(interval(0, 1.00000596)));
+            check("libm: the float program value stays in its interval", true, p.has(prog));
+            programPrecision() = 2;
+            libmCompensation() = false;
+            check("libm: without compensation, the raw bounds", true,
+                  algebra.Sin(interval(0, 1.00000596)).hi() == std::sin(1.00000596));
+            libmCompensation() = true;
+        }
 
         programPrecision() = saved;
     }
