@@ -32,10 +32,16 @@ static double inv(double x)
     return 1 / x;
 }
 
+// Public API: reciprocal bounds and their LSB estimate; empty stays empty.
+// The exact zero point yields +inf with default floating LSB, preserving the
+// historical unsigned-zero convention without estimating a precision at zero.
 interval interval_algebra::Inv(const interval& x) const
 {
     if (x.isEmpty()) {
         return empty();
+    }
+    if (x.isZero()) {
+        return {HUGE_VAL, HUGE_VAL, -24};
     }
 
     int    sign = signMaxValAbs(x);

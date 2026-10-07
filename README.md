@@ -60,8 +60,9 @@ range:
     result is not exact): an elementary operation gives the very bound the program
     computes, and a constant stays a point (`0.1 + 0.2` is the float `0.3f`). Not
     rounded: the integer bounds beyond 2^24 (an integer value may carry a float
-    precision by default) and the nonzero bounds below the smallest normal float
-    (their rounding to 0 would break the invariants of `pow` and `log`).
+    precision by default). Subnormal bounds are rounded too, including underflow
+    to zero; `pow` uses nonzero domain separators representable at the program's
+    precision.
   - `itv::libmCompensation()`, true by default. IEEE 754 requires a correct rounding
     of `+`, `-`, `*`, `/` and `sqrt` only: the functions of the libm (`sin`, `cos`,
     `tan`, the inverse and hyperbolic functions, `exp`, `log`, `log10`, `pow`) may be
@@ -84,6 +85,13 @@ range:
   bounds.
 
 ## Special intervals
+
+Division computes the four endpoint quotients directly, avoiding the extra rounding
+of multiplication by a reciprocal. If the denominator contains zero, or an endpoint
+quotient is indeterminate (`inf/inf`), it conservatively returns `[-inf, +inf]`.
+The affine layer preserves rates for division by a constant corridor; a denominator
+with a rate is collapsed over the full horizon before division, since reciprocal
+curves and interior zero crossings cannot be bounded by endpoint interpolation.
 
 - `interval()` is the historical default interval. It contains every finite value
   representable by a `double` and has an LSB of `-24`.

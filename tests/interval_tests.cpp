@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <random>
@@ -31,6 +32,10 @@ int main()
     check("empty is empty", true, nil.isEmpty());
     check("empty is invalid", false, nil.isValid());
     checkExact("empty intervals compare equal", empty(), empty());
+    check("empty inclusion is reflexive", true, nil <= nil);
+    check("empty is included in every interval", true, nil <= all);
+    check("nonempty is not included in empty", false, all <= nil);
+    check("empty is strictly below nonempty", true, nil < all);
 
     std::ostringstream printedEmpty;
     printedEmpty << nil;
@@ -48,6 +53,41 @@ int main()
     checkExact("overlapping union", reunion(interval(-2, 3), interval(1, 5)), interval(-2, 5));
 
     interval_algebra algebra;
+    // Direct division must enclose the machine quotient, not a product with an
+    // independently rounded reciprocal. Exercise points, signs and interior values.
+    check("double division contains 3/10", true,
+          algebra.Div(interval(3.0), interval(10.0)).has(3.0 / 10.0));
+    checkExact("division with an empty operand", algebra.Div(nil, x), nil);
+    checkExact("division by an empty operand", algebra.Div(x, nil), nil);
+    for (int precision : {1, 2}) {
+        programPrecision() = precision;
+        bool contains      = true;
+        for (double sign : {-1.0, 1.0}) {
+            const interval numerator(-3.7, 12.1), denominator(sign * 0.3, sign * 9.7);
+            const interval quotient = algebra.Div(numerator, denominator);
+            for (int i = 0; i <= 32; ++i) {
+                for (int j = 0; j <= 32; ++j) {
+                    // Clamp interpolation's rounding so the samples belong to
+                    // the tested input intervals, including at their endpoints.
+                    const double a     = std::clamp(numerator.lo() + numerator.size() * i / 32,
+                                                    numerator.lo(), numerator.hi());
+                    const double b     = std::clamp(denominator.lo() + denominator.size() * j / 32,
+                                                    denominator.lo(), denominator.hi());
+                    const double value = precision == 1 ? double(float(a) / float(b)) : a / b;
+                    contains           = contains && quotient.has(value);
+                }
+            }
+        }
+        check(
+            "division contains sampled machine quotients at precision " + std::to_string(precision),
+            true, contains);
+    }
+    programPrecision() = 2;
+    check("division across zero covers both infinities", true,
+          algebra.Div(interval(1), interval(-1, 1)).has(-HUGE_VAL) &&
+              algebra.Div(interval(1), interval(-1, 1)).has(HUGE_VAL));
+    check("division at an indeterminate infinite corner stays conservative", true,
+          algebra.Div(interval(1, HUGE_VAL), interval(1, HUGE_VAL)).has(1));
     checkExact("addition", algebra.Add(interval(-2, 3), interval(4, 5)), interval(2, 8));
     checkExact("subtraction", algebra.Sub(interval(-2, 3), interval(4, 5)), interval(-7, -1));
     checkExact("multiplication", algebra.Mul(interval(-2, 3), interval(4, 5)),
@@ -151,6 +191,27 @@ int main()
         // foreign entities are fullFinite (sound near-top), not empty
         check("affine: foreign is not neutral", false,
               aa.ForeignConst(0, aempty(), aempty()).isEmpty());
+
+        // A reciprocal is curved, so endpoint interpolation excludes interior
+        // values. Collapsing rated denominators also catches an interior pole.
+        affine_algebra shortHorizon(10);
+        const AffItv   numerator = fromItv(interval(1.0));
+        for (double sign : {-1.0, 1.0}) {
+            const AffItv denominator = {sign, sign, sign, sign, -24};
+            const AffItv quotient    = shortHorizon.Div(numerator, denominator);
+            bool         contains    = quotient.isConst();
+            for (int t = 0; t <= 10; ++t) {
+                const double value = 1.0 / (sign * (1 + t));
+                contains           = contains && quotient.lo(t) <= value && value <= quotient.hi(t);
+            }
+            check("affine: rated denominator contains interior reciprocals", true, contains);
+        }
+        const AffItv pole = shortHorizon.Div(numerator, {-1, 0.2, -1, 0.2, -24});
+        check("affine: interior zero crossing covers both infinities", true,
+              pole.lo(5) == -HUGE_VAL && pole.hi(5) == HUGE_VAL);
+        const AffItv linear = shortHorizon.Div({2, 2, 2, 2, -24}, fromItv(interval(2.0)));
+        check("affine: constant denominator preserves the numerator rate", true,
+              linear.a0 == 1 && linear.b0 == 1 && linear.a1 == 1 && linear.b1 == 1);
     }
 
     // ---- the precision of the program (programPrecision, programBound, ulpMargin) ----
@@ -176,7 +237,43 @@ int main()
               interval(0, 16777217.0, 0).hi() == 16777217.0);
         check("single: an integer bound beyond 2^24 is kept", true,
               interval(0, 16777217.0).hi() == 16777217.0);
-        check("single: a tiny positive bound stays positive", true, interval(1e-300, 1).lo() > 0);
+        check("single: a tiny positive bound underflows to zero", true,
+              interval(1e-300, 1).lo() == 0);
+        checkExact("single: underflow normalizes a zero point", interval(1e-300, 1e-300, -149),
+                   interval(0));
+        // Consumers of an underflowed bound must handle zero before estimating
+        // precision; derivatives at these singular points give NaN or infinity.
+        const interval underflowed(1e-300);
+        checkExact("single: log of underflowed zero", algebra.Log(underflowed),
+                   interval(-HUGE_VAL, -HUGE_VAL, -24));
+        checkExact("single: log10 of underflowed zero", algebra.Log10(underflowed),
+                   interval(-HUGE_VAL, -HUGE_VAL, -24));
+        checkExact("single: reciprocal of underflowed zero", algebra.Inv(underflowed),
+                   interval(HUGE_VAL, HUGE_VAL, -24));
+        checkExact("single: sqrt of underflowed zero", algebra.Sqrt(underflowed), interval(0));
+        // Check both signs and the transition from a subnormal result to zero.
+        // Volatile inputs ensure the reference executes at float precision.
+        volatile float smallestNormal = std::numeric_limits<float>::min();
+        volatile float factor         = 0.1f;
+        for (double sign : {-1.0, 1.0}) {
+            const interval product = algebra.Mul(
+                interval(sign * double(smallestNormal), sign * double(smallestNormal), -149),
+                interval(double(factor)));
+            check("single: multiplication contains its subnormal result", true,
+                  product.has(float(sign) * smallestNormal * factor));
+        }
+        volatile float smallestSubnormal = std::numeric_limits<float>::denorm_min();
+        check("single: arithmetic underflow contains the machine zero", true,
+              algebra.Mul(interval(double(smallestSubnormal)), interval(0.25))
+                  .has(smallestSubnormal * 0.25f));
+        check("single: division contains a subnormal quotient", true,
+              algebra.Div(interval(double(smallestNormal)), interval(10.0))
+                  .has(smallestNormal / 10.0f));
+        check("single: division by a subnormal contains float overflow", true,
+              algebra.Div(interval(1.0), interval(double(smallestSubnormal)))
+                  .has(1.0f / smallestSubnormal));
+        check("single: Pow keeps zero out of its positive domain", true,
+              algebra.Pow(interval(0, 1), interval(0.5)).has(0.5));
         check("single: ulpMargin is k float ulps at the magnitude", true,
               ulpMargin(0, 100, 4) == 4 * 0x1p-23 * 100);
 

@@ -26,21 +26,28 @@ namespace itv {
 // interval Log10(const interval& x);
 // void testLog10();
 
+// Public API: uncompensated base-10-log bounds over x intersected with [0, +inf].
+// An empty domain yields empty; a zero-only domain yields the -inf point with
+// default floating LSB, since a finite precision cannot be inferred there.
 interval interval_algebra::Log10Bounds(const interval& x) const
 {
-    if (x.isEmpty()) {
+    const interval i = intersection(interval(0, HUGE_VAL, 0), x);
+    if (i.isEmpty()) {
         return empty();
+    }
+    // Check the domain before evaluating a precision at its singular endpoint.
+    if (i.isZero()) {
+        return {-HUGE_VAL, -HUGE_VAL, -24};
     }
 
     // lowest slope is at the highest bound of the interval
     int precision = exactPrecisionUnary(
-        std::log10, x.hi(),
-        -std::pow(2, x.lsb()));  // -pow because we take the FP number right before the higher bound
+        std::log10, i.hi(),
+        -std::pow(2, i.lsb()));  // -pow because we take the FP number right before the higher bound
     if ((precision == INT_MIN) || taylor_lsb) {
-        precision = floor(x.lsb() - (double)std::log2(std::abs(x.hi())) - std::log2(std::log(10)));
+        precision = floor(i.lsb() - (double)std::log2(std::abs(i.hi())) - std::log2(std::log(10)));
     }
 
-    interval i = intersection(interval(0, HUGE_VAL), x);
     return {log10(i.lo()), log10(i.hi()), precision};
 }
 

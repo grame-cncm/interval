@@ -74,9 +74,16 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Mul(const interval& x, const interval& y) const override;
     void     testMul();
     //
+    // Public API: enclose floating division with directly divided endpoints, using
+    // the current program precision. Empty operands yield empty; a denominator
+    // containing zero or an indeterminate infinite endpoint yields [-inf, +inf].
+    // LSB retains the reciprocal-based estimate for finite nonzero denominators.
     interval Div(const interval& x, const interval& y) const override;
     void     testDiv();
     //
+    // Public API: reciprocal bounds and their LSB estimate; empty stays empty.
+    // The exact zero point yields +inf with default floating LSB, preserving the
+    // historical unsigned-zero convention without estimating a precision at zero.
     interval Inv(const interval& x) const override;
     void     testInv();
     //
@@ -149,10 +156,16 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Le(const interval& x, const interval& y) const override;
     void     testLe();
     interval Log(const interval& x) const override;
-    interval LogBounds(const interval& x) const;  // the libm bounds, uncompensated
+    // Public API: uncompensated natural-log bounds over x intersected with [0, +inf].
+    // An empty domain yields empty; a zero-only domain yields the -inf point with
+    // default floating LSB, since a finite precision cannot be inferred there.
+    interval LogBounds(const interval& x) const;
     void     testLog();
     interval Log10(const interval& x) const override;
-    interval Log10Bounds(const interval& x) const;  // the libm bounds, uncompensated
+    // Public API: uncompensated base-10-log bounds over x intersected with [0, +inf].
+    // An empty domain yields empty; a zero-only domain yields the -inf point with
+    // default floating LSB, since a finite precision cannot be inferred there.
+    interval Log10Bounds(const interval& x) const;
     void     testLog10();
     interval Lsh(const interval& x, const interval& y) const override;
     void     testLsh();
@@ -188,6 +201,8 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Sinh(const interval& x) const override;
     interval SinhBounds(const interval& x) const;  // the libm bounds, uncompensated
     void     testSinh();
+    // Public API: square-root bounds over x intersected with [0, +inf], with an LSB
+    // estimate. An empty domain yields empty; a zero-only domain yields exact zero.
     interval Sqrt(const interval& x) const override;
     void     testSqrt();
     interval Tan(const interval& x) const override;

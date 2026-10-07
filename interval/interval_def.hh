@@ -70,17 +70,14 @@ inline bool& libmCompensation()
  * not exact. Not covered : the C++ compiler's FMA contraction and reassociation, the
  * libm (not correctly rounded) ; the decisions keep their own margin for those (the
  * guard of a table access near its edges). Round to nearest, not outward : a constant
- * stays a point. Left as they are : an integer bound beyond 2^24 (an integer value may
- * carry a float precision by default) and a nonzero bound below the smallest normal
- * float (its rounding to 0 would break the invariants of pow and log).
+ * stays a point. Subnormal results and underflow to zero follow the same rounding.
+ * An integer bound beyond 2^24 is left unchanged because an integer value may carry
+ * a float precision by default.
  */
 inline double programBound(double b)
 {
     if (programPrecision() != 1 || std::isnan(b) || std::isinf(b)) return b;
     if (std::fabs(b) >= 16777216.0 && b == std::floor(b)) return b;
-    // below the smallest normal float, the rounding would reach 0 and break the
-    // invariants of the operations (a positive bound stays positive : pow, log)
-    if (b != 0 && std::fabs(b) < 0x1p-126) return b;
     return double(float(b));
 }
 
@@ -144,6 +141,10 @@ class interval {
             if (fLSB < 0) {
                 fLo = programBound(fLo);
                 fHi = programBound(fHi);
+                // Underflow can turn a nonzero interval into the exact zero point.
+                if (fLo == 0 && fHi == 0) {
+                    fLSB = 0;
+                }
             }
         }
     }
@@ -339,8 +340,16 @@ inline bool operator==(const interval& i, const interval& j)
     return (i.isEmpty() && j.isEmpty()) || ((i.lo() == j.lo()) && (i.hi() == j.hi()));
 }
 
+// Public API: bounds-only inclusion, independent of LSB. Empty is the bottom
+// element, including when both operands are empty; NaN comparisons cannot encode it.
 inline bool operator<=(const interval& i, const interval& j)
 {
+    if (i.isEmpty()) {
+        return true;
+    }
+    if (j.isEmpty()) {
+        return false;
+    }
     return (i.lo() >= j.lo()) && (i.hi() <= j.hi());
 }
 

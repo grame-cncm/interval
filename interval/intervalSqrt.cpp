@@ -28,12 +28,18 @@ namespace itv {
 
 static const interval SqrtDomain(0, HUGE_VAL, 0);
 
+// Public API: square-root bounds over x intersected with [0, +inf], with an LSB
+// estimate. An empty domain yields empty; a zero-only domain yields exact zero.
 interval interval_algebra::Sqrt(const interval& x) const
 {
     interval i = intersection(SqrtDomain, x);
 
     if (i.isEmpty()) {
         return empty();
+    }
+    // There is no preceding nonnegative sample at the exact zero point.
+    if (i.isZero()) {
+        return interval(0);
     }
     /* if (i.lo() < 0) {
         return {};  // sqrt of negative numbers

@@ -171,8 +171,14 @@ interval interval_algebra::PowBounds(const interval& x, const interval& y) const
     }
 
     interval z  = empty();
-    interval xp = intersection(x, interval{nexttoward(0.0, 1.0), HUGE_VAL, 0});
-    interval xn = intersection(x, interval{-HUGE_VAL, nexttoward(0.0, -1.0), 0});
+    // The nonzero domain separators must survive rounding to the program's
+    // precision: a double subnormal rounds to zero in single precision and would
+    // admit zero into fPow, whose logarithmic decomposition requires x > 0.
+    const double smallest = programPrecision() == 1
+                                ? double(std::numeric_limits<float>::denorm_min())
+                                : std::numeric_limits<double>::denorm_min();
+    interval     xp       = intersection(x, interval{smallest, HUGE_VAL, 0});
+    interval     xn       = intersection(x, interval{-HUGE_VAL, -smallest, 0});
 
     if (y.hasZero()) {
         // x^0 = 1

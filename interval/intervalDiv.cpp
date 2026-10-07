@@ -24,10 +24,35 @@ namespace itv {
 //------------------------------------------------------------------------------------------
 // Interval division
 
+// Public API: enclose floating division with directly divided endpoints, using
+// the current program precision. Empty operands yield empty; a denominator
+// containing zero or an indeterminate infinite endpoint yields [-inf, +inf].
+// LSB retains the reciprocal-based estimate for finite nonzero denominators.
 interval interval_algebra::Div(const interval& x, const interval& y) const
 {
-    interval D = Mul(x, Inv(y));
-    return D;
+    if (x.isEmpty() || y.isEmpty()) {
+        return empty();
+    }
+    if (y.hasZero()) {
+        return {-HUGE_VAL, HUGE_VAL, std::min({x.lsb(), y.lsb(), -24})};
+    }
+
+    // Multiplication by a rounded reciprocal differs from a single division by
+    // an ulp even for point operands. The four corners bound a zero-free quotient.
+    auto quotient = [](double numerator, double denominator) {
+        // Div is a floating operation even when the operands' LSB is nonnegative.
+        // Evaluate single-precision endpoints as floats, including overflow.
+        return programPrecision() == 1 ? double(float(numerator) / float(denominator))
+                                       : numerator / denominator;
+    };
+    const double a = quotient(x.lo(), y.lo()), b = quotient(x.lo(), y.hi());
+    const double c = quotient(x.hi(), y.lo()), d = quotient(x.hi(), y.hi());
+    if (std::isnan(a) || std::isnan(b) || std::isnan(c) || std::isnan(d)) {
+        return {-HUGE_VAL, HUGE_VAL, std::min({x.lsb(), y.lsb(), -24})};
+    }
+    // Keep the established precision estimate without using reciprocal bounds.
+    const int precision = x.lsb() + Inv(y).lsb();
+    return {std::min({a, b, c, d}), std::max({a, b, c, d}), precision};
 }
 
 double div(double x, double y)

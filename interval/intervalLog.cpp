@@ -28,12 +28,20 @@ namespace itv {
 
 static const interval domain{0, HUGE_VAL, 0};
 
+// Public API: uncompensated natural-log bounds over x intersected with [0, +inf].
+// An empty domain yields empty; a zero-only domain yields the -inf point with
+// default floating LSB, since a finite precision cannot be inferred there.
 interval interval_algebra::LogBounds(const interval& x) const
 {
     interval i = intersection(x, domain);
 
     if (i.isEmpty()) {
         return empty();
+    }
+    // Underflow can produce an exact zero. Avoid differentiating log at that
+    // singular point: the precision helper would cast a NaN to int.
+    if (i.isZero()) {
+        return {-HUGE_VAL, -HUGE_VAL, -24};
     }
 
     // lowest slope is at the highest bound of the interval

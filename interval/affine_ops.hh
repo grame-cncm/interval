@@ -470,16 +470,17 @@ class AffineOps : public Base {
         return fromItv(f(toItv(x, fT), toItv(y, fT)));
     }
 
-    /// Multiplication (or division) where at most one operand carries a rate: evaluate
-    /// the oracle at both endpoints, chord back (min/max of affine functions, sound by
-    /// convexity). Two rated operands would be quadratic in t: collapse.
+    /// Multiplication with at most one rated operand, or division by a constant
+    /// corridor: evaluate the oracle at both endpoints and chord back. A rated
+    /// denominator is nonlinear, even with a constant numerator, and may cross zero
+    /// between the endpoints; collapse it over the full horizon instead.
     AffItv mulDivByConst(const AffItv& x, const AffItv& y, bool isDiv) const
     {
         if (x.isEmpty() || y.isEmpty()) return aempty();
         auto op = [&](const interval& a, const interval& b) {
             return isDiv ? fItv.Div(a, b) : fItv.Mul(a, b);
         };
-        if (x.isConst() == y.isConst()) {  // both const, or both rated (quadratic)
+        if ((isDiv && !y.isConst()) || x.isConst() == y.isConst()) {
             return fromItv(op(toItv(x, fT), toItv(y, fT)));
         }
         auto at = [&](double t) {
