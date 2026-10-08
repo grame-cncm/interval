@@ -21,7 +21,7 @@
 
 #include <limits.h>
 #include <algorithm>
-#include <bit>
+#include "cxx_compat.hh"
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
@@ -88,7 +88,7 @@ inline double programBound(double b)
     const double midpoint = (double(lower) + double(upper)) * 0.5;
     if (b < midpoint) return double(lower);
     if (b > midpoint) return double(upper);
-    return double((std::bit_cast<uint32_t>(lower) & 1u) == 0 ? lower : upper);
+    return double((compat::bit_cast<uint32_t>(lower) & 1u) == 0 ? lower : upper);
 }
 
 /**

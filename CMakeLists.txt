@@ -20,6 +20,9 @@ file(GLOB INTERVAL_SOURCES CONFIGURE_DEPENDS interval/*.cpp)
 
 add_library(interval STATIC ${INTERVAL_SOURCES})
 target_include_directories(interval PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/FaustAlgebra)
+# The hosts of the library (the Faust compiler among them) build it as C++17 ; the
+# tests may use C++20, the library itself must not (cxx_compat.hh).
+set_target_properties(interval PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
 # Production code has no multiprecision dependency. MPFR is an explicit opt-in
 # test oracle; a normal or cross-compiled build never searches for host packages.

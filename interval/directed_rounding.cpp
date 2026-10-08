@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <bit>
+#include "cxx_compat.hh"
 #include <cfenv>
 #include <cstdint>
 
@@ -51,7 +51,7 @@ bool containsPiLattice(double lo, double hi, double offset, unsigned period)
 // This avoids a hardware FMA requirement and a residual that can underflow to 0.
 struct Wide {
     uint64_t hi = 0, lo = 0;
-    int bits() const { return hi ? 128 - std::countl_zero(hi) : 64 - std::countl_zero(lo); }
+    int bits() const { return hi ? 128 - compat::countl_zero(hi) : 64 - compat::countl_zero(lo); }
 };
 
 Wide product(uint64_t a, uint64_t b)
@@ -77,7 +77,7 @@ struct Dyadic { Wide significand; int exponent; bool negative; };
 
 Dyadic dyadic(double x)
 {
-    const uint64_t bits = std::bit_cast<uint64_t>(x);
+    const uint64_t bits = compat::bit_cast<uint64_t>(x);
     const int exponent = int((bits >> 52) & 0x7ff);
     const uint64_t fraction = bits & UINT64_C(0xfffffffffffff);
     return {{0, fraction | (exponent ? UINT64_C(0x10000000000000) : 0)},
