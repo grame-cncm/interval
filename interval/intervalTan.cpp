@@ -34,7 +34,7 @@ static double tanPi(double x)
 }
 
 // Public API: numeric tan image on its valid domain. In double precision,
-// MPFR encloses endpoint values and interior extrema; other precisions retain
+// the native kernel encloses endpoints and extrema; other precisions retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::TanBounds(const interval& x) const
 {

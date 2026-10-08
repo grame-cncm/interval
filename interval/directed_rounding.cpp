@@ -17,7 +17,11 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <mpfr.h>
+#include <bit>
+#include <cfenv>
+#include <cstdint>
+
+#include "reference_math.hh"
 
 namespace itv::detail {
 namespace {
@@ -27,51 +31,128 @@ static_assert(std::numeric_limits<double>::is_iec559 &&
               std::numeric_limits<double>::max_exponent == 1024,
               "Directed double bounds require IEEE binary64 storage.");
 
-// An embedding application can restrict MPFR's thread-local exponent range.
-// Never load a double inexactly under that restriction; use an unrestricted
-// numeric bound instead of changing the caller's MPFR configuration.
-bool usableExponentRange()
-{
-    return mpfr_get_emin() <= -1073 && mpfr_get_emax() >= 1024;
-}
-
-// Local MPFR values own their storage. Binary64 inputs load exactly at 53 bits;
-// a wider exponent range prevents premature underflow before directed get_d.
-class Number {
-   public:
-    mpfr_t value;
-    explicit Number(mpfr_prec_t precision = 53) { mpfr_init2(value, precision); }
-    ~Number() { mpfr_clear(value); }
-    Number(const Number&) = delete;
-    Number& operator=(const Number&) = delete;
-};
-
-mpfr_rnd_t mode(Direction direction)
-{
-    return direction == Direction::Down ? MPFR_RNDD : MPFR_RNDU;
-}
-
-// Test whether a critical point pi*(offset + period*k) may occur in [lo, hi].
-// Interval division by enclosing values of pi avoids false negatives from host
-// argument reduction; at huge phases uncertainty deliberately includes extrema.
+// Locate extrema with enclosing pi and directed elementary arithmetic. If large
+// phases cannot distinguish neighbouring integers, include the critical point.
 bool containsPiLattice(double lo, double hi, double offset, unsigned period)
 {
-    if (!usableExponentRange()) return true;
     if (!std::isfinite(lo) || !std::isfinite(hi)) return true;
-    Number piLo(128), piHi(128), lower(128), upper(128), input(128);
-    mpfr_const_pi(piLo.value, MPFR_RNDD);
-    mpfr_const_pi(piHi.value, MPFR_RNDU);
-    mpfr_set_d(input.value, lo, MPFR_RNDN);
-    mpfr_div(lower.value, input.value, lo < 0 ? piLo.value : piHi.value, MPFR_RNDD);
-    mpfr_sub_d(lower.value, lower.value, offset, MPFR_RNDD);
-    mpfr_div_ui(lower.value, lower.value, period, MPFR_RNDD);
-    mpfr_set_d(input.value, hi, MPFR_RNDN);
-    mpfr_div(upper.value, input.value, hi < 0 ? piHi.value : piLo.value, MPFR_RNDU);
-    mpfr_sub_d(upper.value, upper.value, offset, MPFR_RNDU);
-    mpfr_div_ui(upper.value, upper.value, period, MPFR_RNDU);
-    mpfr_ceil(lower.value, lower.value);
-    mpfr_floor(upper.value, upper.value);
-    return mpfr_cmp(lower.value, upper.value) <= 0;
+    const double piLo = directedPi(Direction::Down), piHi = directedPi(Direction::Up);
+    double lower = directedBinary(BinaryOp::Div, lo, lo < 0 ? piLo : piHi, Direction::Down);
+    double upper = directedBinary(BinaryOp::Div, hi, hi < 0 ? piHi : piLo, Direction::Up);
+    lower = directedBinary(BinaryOp::Sub, lower, offset, Direction::Down);
+    upper = directedBinary(BinaryOp::Sub, upper, offset, Direction::Up);
+    lower = directedBinary(BinaryOp::Div, lower, period, Direction::Down);
+    upper = directedBinary(BinaryOp::Div, upper, period, Direction::Up);
+    if (std::abs(lower) >= 0x1p52 || std::abs(upper) >= 0x1p52) return true;
+    return std::ceil(lower) <= std::floor(upper);
+}
+
+// Two 64-bit limbs hold the exact product of binary64's 53-bit significands.
+// This avoids a hardware FMA requirement and a residual that can underflow to 0.
+struct Wide {
+    uint64_t hi = 0, lo = 0;
+    int bits() const { return hi ? 128 - std::countl_zero(hi) : 64 - std::countl_zero(lo); }
+};
+
+Wide product(uint64_t a, uint64_t b)
+{
+    const uint64_t mask = UINT64_C(0xffffffff);
+    const uint64_t low = (a & mask) * (b & mask);
+    const uint64_t middle = (a >> 32) * (b & mask) + (low >> 32);
+    const uint64_t other = (a & mask) * (b >> 32) + (middle & mask);
+    return {(a >> 32) * (b >> 32) + (middle >> 32) + (other >> 32),
+            (other << 32) | (low & mask)};
+}
+
+Wide shifted(Wide x, int n)
+{
+    if (n == 0) return x;
+    if (n >= 64) return {x.lo << (n - 64), 0};
+    return {(x.hi << n) | (x.lo >> (64 - n)), x.lo << n};
+}
+
+// A finite double is an exact signed integer significand times a power of two.
+// Exponents remain unrestricted here, so products cannot underflow or overflow.
+struct Dyadic { Wide significand; int exponent; bool negative; };
+
+Dyadic dyadic(double x)
+{
+    const uint64_t bits = std::bit_cast<uint64_t>(x);
+    const int exponent = int((bits >> 52) & 0x7ff);
+    const uint64_t fraction = bits & UINT64_C(0xfffffffffffff);
+    return {{0, fraction | (exponent ? UINT64_C(0x10000000000000) : 0)},
+            exponent ? exponent - 1075 : -1074, bool(bits >> 63)};
+}
+
+Dyadic multiplied(double x, double y)
+{
+    const Dyadic a = dyadic(x), b = dyadic(y);
+    return {product(a.significand.lo, b.significand.lo), a.exponent + b.exponent,
+            a.negative != b.negative};
+}
+
+int compareMagnitude(Dyadic a, Dyadic b)
+{
+    const int na = a.significand.bits(), nb = b.significand.bits();
+    if (!na || !nb) return (na > 0) - (nb > 0);
+    const int ea = a.exponent + na, eb = b.exponent + nb;
+    if (ea != eb) return ea > eb ? 1 : -1;
+    // Equal leading exponents need at most 105 bits of alignment, all within
+    // the two limbs. No lossy floating subtraction is used for this comparison.
+    a.significand = shifted(a.significand, std::max(0, nb - na));
+    b.significand = shifted(b.significand, std::max(0, na - nb));
+    if (a.significand.hi != b.significand.hi)
+        return a.significand.hi > b.significand.hi ? 1 : -1;
+    return (a.significand.lo > b.significand.lo) - (a.significand.lo < b.significand.lo);
+}
+
+int compare(Dyadic a, Dyadic b)
+{
+    if (!a.significand.bits()) a.negative = false;
+    if (!b.significand.bits()) b.negative = false;
+    if (a.negative != b.negative) return a.negative ? -1 : 1;
+    const int magnitude = compareMagnitude(a, b);
+    return a.negative ? -magnitude : magnitude;
+}
+
+// Compare an exact finite dyadic with a rounded double, including overflow.
+int compare(Dyadic exact, double rounded)
+{
+    if (std::isinf(rounded)) return rounded > 0 ? -1 : 1;
+    return compare(exact, dyadic(rounded));
+}
+
+double adjusted(double rounded, int exactMinusRounded, Direction direction)
+{
+    if ((direction == Direction::Down && exactMinusRounded < 0) ||
+        (direction == Direction::Up && exactMinusRounded > 0))
+        return std::nextafter(rounded, direction == Direction::Down ? -HUGE_VAL : HUGE_VAL);
+    return rounded;
+}
+
+// A neighbour in the requested direction is safe in every IEEE rounding mode.
+// It is used only when an exact residual is unavailable (notably non-nearest sums).
+double widened(double rounded, Direction direction)
+{
+    return std::nextafter(rounded, direction == Direction::Down ? -HUGE_VAL : HUGE_VAL);
+}
+
+bool nearestMode()
+{
+#ifdef __EMSCRIPTEN__
+    return true; // WebAssembly scalar arithmetic has a fixed nearest-even mode.
+#else
+    return std::fegetround() == FE_TONEAREST;
+#endif
+}
+
+// Reference series produce both directions together. Reuse their enclosure
+// rather than evaluating the same polynomial again for each bound of a point.
+NumericBounds scalarBounds(UnaryOp op, double x)
+{
+    if (op == UnaryOp::Sqrt)
+        return {directedUnary(op, x, Direction::Down), directedUnary(op, x, Direction::Up)};
+    return referenceUnary(op, x);
 }
 
 interval positivePower(double lo, double hi, double elo, double ehi, int lsb)
@@ -79,8 +160,8 @@ interval positivePower(double lo, double hi, double elo, double ehi, int lsb)
     double lower = HUGE_VAL, upper = -HUGE_VAL;
     for (double base : {lo, hi}) {
         for (double exponent : {elo, ehi}) {
-            const double a = directedBinary(BinaryOp::Pow, base, exponent, Direction::Down);
-            const double b = directedBinary(BinaryOp::Pow, base, exponent, Direction::Up);
+            const NumericBounds value = referenceBinary(BinaryOp::Pow, base, exponent);
+            const double a = value.lo, b = value.hi;
             // Indeterminate extended-real corners must not discard finite values
             // attained inside the rectangle (e.g. 1^inf or inf^0).
             if (std::isnan(a) || std::isnan(b)) return {0, HUGE_VAL, lsb};
@@ -93,64 +174,68 @@ interval positivePower(double lo, double hi, double elo, double ehi, int lsb)
 
 }  // namespace
 
-// Internal kernel: enclose the exact binary operation in the requested direction.
-// Both MPFR evaluation and conversion are directed, so subnormal rounding cannot
-// undo the inclusion established at MPFR's wider exponent range.
+// Internal kernel: exact residual/comparison chooses whether the rounded result
+// needs its neighbouring double. Invalid operations give NaN; fenv is unchanged.
 double directedBinary(BinaryOp op, double x, double y, Direction direction)
 {
-    if (!usableExponentRange()) return direction == Direction::Down ? -HUGE_VAL : HUGE_VAL;
-    Number a, b, result;
-    mpfr_set_d(a.value, x, MPFR_RNDN);
-    mpfr_set_d(b.value, y, MPFR_RNDN);
-    const auto rounding = mode(direction);
-    switch (op) {
-        case BinaryOp::Add: mpfr_add(result.value, a.value, b.value, rounding); break;
-        case BinaryOp::Sub: mpfr_sub(result.value, a.value, b.value, rounding); break;
-        case BinaryOp::Mul: mpfr_mul(result.value, a.value, b.value, rounding); break;
-        case BinaryOp::Div: mpfr_div(result.value, a.value, b.value, rounding); break;
-        case BinaryOp::Pow: mpfr_pow(result.value, a.value, b.value, rounding); break;
-        case BinaryOp::Atan2: mpfr_atan2(result.value, a.value, b.value, rounding); break;
-        case BinaryOp::Fmod: mpfr_fmod(result.value, a.value, b.value, rounding); break;
-        case BinaryOp::Remainder: mpfr_remainder(result.value, a.value, b.value, rounding); break;
+    if (op != BinaryOp::Add && op != BinaryOp::Sub && op != BinaryOp::Mul && op != BinaryOp::Div) {
+        const NumericBounds bounds = referenceBinary(op, x, y);
+        return direction == Direction::Down ? bounds.lo : bounds.hi;
     }
-    return mpfr_get_d(result.value, rounding);
+    if (op == BinaryOp::Sub) y = -y;
+    if (op == BinaryOp::Add || op == BinaryOp::Sub) {
+        const double r = x + y;
+        if (!std::isfinite(x) || !std::isfinite(y) || std::isnan(r)) return r;
+        if (!std::isfinite(r) || !nearestMode()) return widened(r, direction);
+        // TwoSum recovers the exact addition residual, including subnormals.
+        const double z = r - x;
+        const double error = (x - (r - z)) + (y - z);
+        if (!std::isfinite(error)) return widened(r, direction);
+        return adjusted(r, (error > 0) - (error < 0), direction);
+    }
+    if (op == BinaryOp::Mul) {
+        const double r = x * y;
+        if (!std::isfinite(x) || !std::isfinite(y) || std::isnan(r)) return r;
+        return adjusted(r, compare(multiplied(x, y), r), direction);
+    }
+    const double r = x / y;
+    if (!std::isfinite(x) || !std::isfinite(y) || y == 0 || std::isnan(r)) return r;
+    // sign(x/y - r) = sign(x - r*y) * sign(y). Infinite rounded quotients
+    // still bracket a finite exact quotient with max-finite on the inner side.
+    if (std::isinf(r)) return widened(r, direction);
+    const int residual = compare(dyadic(x), multiplied(r, y));
+    return adjusted(r, y < 0 ? -residual : residual, direction);
 }
 
-// Internal kernel: enclose the exact unary operation; invalid arguments give NaN.
+// Internal kernel: sqrt is correctly rounded; an exact significand comparison
+// with r*r determines the outward neighbour without trusting an underflowed FMA.
 double directedUnary(UnaryOp op, double x, Direction direction)
 {
-    if (!usableExponentRange()) return direction == Direction::Down ? -HUGE_VAL : HUGE_VAL;
-    Number input, result;
-    mpfr_set_d(input.value, x, MPFR_RNDN);
-    const auto rounding = mode(direction);
-    switch (op) {
-        case UnaryOp::Sqrt: mpfr_sqrt(result.value, input.value, rounding); break;
-        case UnaryOp::Acos: mpfr_acos(result.value, input.value, rounding); break;
-        case UnaryOp::Acosh: mpfr_acosh(result.value, input.value, rounding); break;
-        case UnaryOp::Asin: mpfr_asin(result.value, input.value, rounding); break;
-        case UnaryOp::Asinh: mpfr_asinh(result.value, input.value, rounding); break;
-        case UnaryOp::Atan: mpfr_atan(result.value, input.value, rounding); break;
-        case UnaryOp::Atanh: mpfr_atanh(result.value, input.value, rounding); break;
-        case UnaryOp::Cos: mpfr_cos(result.value, input.value, rounding); break;
-        case UnaryOp::Cosh: mpfr_cosh(result.value, input.value, rounding); break;
-        case UnaryOp::Exp: mpfr_exp(result.value, input.value, rounding); break;
-        case UnaryOp::Log: mpfr_log(result.value, input.value, rounding); break;
-        case UnaryOp::Log10: mpfr_log10(result.value, input.value, rounding); break;
-        case UnaryOp::Sin: mpfr_sin(result.value, input.value, rounding); break;
-        case UnaryOp::Sinh: mpfr_sinh(result.value, input.value, rounding); break;
-        case UnaryOp::Tan: mpfr_tan(result.value, input.value, rounding); break;
-        case UnaryOp::Tanh: mpfr_tanh(result.value, input.value, rounding); break;
+    if (op != UnaryOp::Sqrt) {
+        const NumericBounds bounds = referenceUnary(op, x);
+        return direction == Direction::Down ? bounds.lo : bounds.hi;
     }
-    return mpfr_get_d(result.value, rounding);
+    const double r = std::sqrt(x);
+    if (!std::isfinite(x) || std::isnan(r)) return r;
+    return adjusted(r, compare(dyadic(x), multiplied(r, r)), direction);
 }
 
-// Internal kernel: bound pi itself rather than treating the nearest M_PI as exact.
+// Internal kernel: scaling changes only the exact dyadic exponent. Comparing
+// with scalbn's rounded result covers gradual underflow and finite overflow.
+double directedScale(double x, int exponent, Direction direction)
+{
+    const double r = std::scalbn(x, exponent);
+    if (!std::isfinite(x) || x == 0) return r;
+    Dyadic exact = dyadic(x);
+    exact.exponent += exponent;
+    return adjusted(r, compare(exact, r), direction);
+}
+
+// Precomputed neighbouring binary64 values straddle mathematical pi. These
+// hexadecimal constants are also verified by the optional MPFR oracle.
 double directedPi(Direction direction)
 {
-    if (!usableExponentRange()) return direction == Direction::Down ? -HUGE_VAL : HUGE_VAL;
-    Number result;
-    mpfr_const_pi(result.value, mode(direction));
-    return mpfr_get_d(result.value, mode(direction));
+    return direction == Direction::Down ? 0x1.921fb54442d18p+1 : 0x1.921fb54442d19p+1;
 }
 
 // Numeric image on the valid real domain; endpoint evaluation is supplemented by
@@ -183,10 +268,8 @@ interval doubleUnaryBounds(UnaryOp op, const interval& x)
         if (op == UnaryOp::Tan && containsPiLattice(lo, hi, 0.5, 1))
             return {-HUGE_VAL, HUGE_VAL, lsb};
         if (!std::isfinite(lo) || !std::isfinite(hi)) return {-1, 1, lsb};
-        double lower = std::min(directedUnary(op, lo, Direction::Down),
-                                directedUnary(op, hi, Direction::Down));
-        double upper = std::max(directedUnary(op, lo, Direction::Up),
-                                directedUnary(op, hi, Direction::Up));
+        const NumericBounds a = scalarBounds(op, lo), b = lo == hi ? a : scalarBounds(op, hi);
+        double lower = std::min(a.lo, b.lo), upper = std::max(a.hi, b.hi);
         if (op == UnaryOp::Sin) {
             if (containsPiLattice(lo, hi, 0.5, 2)) upper = 1;
             if (containsPiLattice(lo, hi, -0.5, 2)) lower = -1;
@@ -197,13 +280,12 @@ interval doubleUnaryBounds(UnaryOp op, const interval& x)
         return {lower, upper, lsb};
     }
     if (op == UnaryOp::Cosh) {
-        return {x.hasZero() ? 1 : std::min(directedUnary(op, lo, Direction::Down),
-                                          directedUnary(op, hi, Direction::Down)),
-                std::max(directedUnary(op, lo, Direction::Up),
-                         directedUnary(op, hi, Direction::Up)), lsb};
+        const NumericBounds a = scalarBounds(op, lo), b = lo == hi ? a : scalarBounds(op, hi);
+        return {x.hasZero() ? 1 : std::min(a.lo, b.lo), std::max(a.hi, b.hi), lsb};
     }
     if (op == UnaryOp::Acos) std::swap(lo, hi); // decreasing on [-1, 1]
-    return {directedUnary(op, lo, Direction::Down), directedUnary(op, hi, Direction::Up), lsb};
+    const NumericBounds a = scalarBounds(op, lo), b = lo == hi ? a : scalarBounds(op, hi);
+    return {a.lo, b.hi, lsb};
 }
 
 // Numeric atan2 image. Rectangular extrema are corners except at the negative
@@ -219,8 +301,9 @@ interval doubleAtan2Bounds(const interval& y, const interval& x)
     double lower = HUGE_VAL, upper = -HUGE_VAL;
     for (double a : {y.lo(), y.hi()}) {
         for (double b : {x.lo(), x.hi()}) {
-            lower = std::min(lower, directedBinary(BinaryOp::Atan2, a, b, Direction::Down));
-            upper = std::max(upper, directedBinary(BinaryOp::Atan2, a, b, Direction::Up));
+            const NumericBounds value = referenceBinary(BinaryOp::Atan2, a, b);
+            lower = std::min(lower, value.lo);
+            upper = std::max(upper, value.hi);
         }
     }
     return {lower, upper, lsb};
@@ -235,7 +318,7 @@ interval doublePowBounds(const interval& x, const interval& y)
     const int lsb = std::min({x.lsb(), y.lsb(), -24});
     interval result = empty();
     if (x.hi() >= 0) result = positivePower(std::max(0.0, x.lo()), x.hi(), y.lo(), y.hi(), lsb);
-    // MPFR/IEEE pow also defines some noninteger powers of -inf, although the
+    // IEEE pow also defines some noninteger powers of -inf, although the
     // corresponding finite negative bases have no real image. Keep those numeric
     // exceptional results instead of dropping the infinite endpoint entirely.
     if (x.lo() == -HUGE_VAL) {
@@ -252,8 +335,8 @@ interval doublePowBounds(const interval& x, const interval& y)
                 std::abs(first) >= 0x1p53 || std::abs(last) >= 0x1p53)
                 return {-HUGE_VAL, HUGE_VAL, lsb};
             for (int parity : {0, 1}) {
-                const double a = first + (std::fmod(std::abs(first), 2.0) == parity ? 0 : 1);
-                const double b = last - (std::fmod(std::abs(last), 2.0) == parity ? 0 : 1);
+                const double a = first + (int(uint64_t(std::abs(first)) & 1) == parity ? 0 : 1);
+                const double b = last - (int(uint64_t(std::abs(last)) & 1) == parity ? 0 : 1);
                 if (a > b) continue;
                 const interval magnitude = positivePower(std::max(0.0, -x.hi()), -x.lo(), a, b, lsb);
                 result = reunion(result, parity == 0 ? magnitude
@@ -271,8 +354,8 @@ interval doubleFmodBounds(const interval& x, const interval& y)
     if (x.isEmpty() || y.isEmpty() || y.isZero()) return empty();
     const int lsb = std::min({x.lsb(), y.lsb(), -24});
     if (x.isconst() && y.isconst()) {
-        return {directedBinary(BinaryOp::Fmod, x.lo(), y.lo(), Direction::Down),
-                directedBinary(BinaryOp::Fmod, x.hi(), y.hi(), Direction::Up), lsb};
+        const NumericBounds value = referenceBinary(BinaryOp::Fmod, x.lo(), y.lo());
+        return {value.lo, value.hi, lsb};
     }
     const double magnitude = std::min(std::max(std::abs(x.lo()), std::abs(x.hi())),
                                       std::max(std::abs(y.lo()), std::abs(y.hi())));

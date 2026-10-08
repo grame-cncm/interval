@@ -3,22 +3,27 @@ name: Windows
 on:
   push:
     branches: 
-      - '*'
+      - '**'
   pull_request:
     branches: 
-      - '*'
+      - '**'
 
 jobs:
   build:
+
+    strategy:
+      matrix:
+        mpfr: ["OFF", "ON"]
 
     runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v3
-    - name: install directed-rounding dependencies
+    - name: install optional oracle dependencies
+      if: matrix.mpfr == 'ON'
       run: '& "$env:VCPKG_INSTALLATION_ROOT/vcpkg.exe" install mpfr:x64-windows'
     - name: create cmake project
-      run: cmake -S . -B build -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows
+      run: cmake -S . -B build -A x64 -DNOTIDY=ON -DINTERVAL_ENABLE_MPFR_TESTS=${{ matrix.mpfr }} -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows
     - name: build project
       run: cmake --build build --config Debug
     - name: execute tests

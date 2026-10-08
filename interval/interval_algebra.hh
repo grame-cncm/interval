@@ -115,14 +115,14 @@ class interval_algebra : public FaustAlgebra<interval> {
 
     interval Acos(const interval& x) const override;
     // Public API: numeric acos image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AcosBounds(const interval& x) const;
     void     testAcos();
     //
     interval Acosh(const interval& x) const override;
     // Public API: numeric acosh image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AcoshBounds(const interval& x) const;
     void     testAcosh();
@@ -132,21 +132,21 @@ class interval_algebra : public FaustAlgebra<interval> {
     //
     interval Asin(const interval& x) const override;
     // Public API: numeric asin image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AsinBounds(const interval& x) const;
     void     testAsin();
     //
     interval Asinh(const interval& x) const override;
     // Public API: numeric asinh image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AsinhBounds(const interval& x) const;
     void     testAsinh();
     //
     interval Atan(const interval& x) const override;
     // Public API: numeric atan image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AtanBounds(const interval& x) const;
     void     testAtan();
@@ -160,7 +160,7 @@ class interval_algebra : public FaustAlgebra<interval> {
     //
     interval Atanh(const interval& x) const override;
     // Public API: numeric atanh image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AtanhBounds(const interval& x) const;
     void     testAtanh();
@@ -169,13 +169,13 @@ class interval_algebra : public FaustAlgebra<interval> {
     void     testCeil();
     interval Cos(const interval& x) const override;
     // Public API: numeric cos image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval CosBounds(const interval& x) const;
     void     testCos();
     interval Cosh(const interval& x) const override;
     // Public API: numeric cosh image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval CoshBounds(const interval& x) const;
     void     testCosh();
@@ -185,7 +185,7 @@ class interval_algebra : public FaustAlgebra<interval> {
     void     testEq();
     interval Exp(const interval& x) const override;
     // Public API: numeric exp image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval ExpBounds(const interval& x) const;
     void     testExp();
@@ -204,13 +204,13 @@ class interval_algebra : public FaustAlgebra<interval> {
     void     testLe();
     interval Log(const interval& x) const override;
     // Public API: numeric log image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval LogBounds(const interval& x) const;
     void     testLog();
     interval Log10(const interval& x) const override;
     // Public API: numeric log10 image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval Log10Bounds(const interval& x) const;
     void     testLog10();
@@ -250,13 +250,13 @@ class interval_algebra : public FaustAlgebra<interval> {
     void     testRsh();
     interval Sin(const interval& x) const override;
     // Public API: numeric sin image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval SinBounds(const interval& x) const;
     void     testSin();
     interval Sinh(const interval& x) const override;
     // Public API: numeric sinh image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval SinhBounds(const interval& x) const;
     void     testSinh();
@@ -267,13 +267,13 @@ class interval_algebra : public FaustAlgebra<interval> {
     void     testSqrt();
     interval Tan(const interval& x) const override;
     // Public API: numeric tan image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval TanBounds(const interval& x) const;
     void     testTan();
     interval Tanh(const interval& x) const override;
     // Public API: numeric tanh image on its valid domain. In double precision,
-    // MPFR encloses endpoint values and interior extrema; other precisions retain
+    // the native kernel encloses endpoints and extrema; other precisions retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval TanhBounds(const interval& x) const;
     void     testTanh();

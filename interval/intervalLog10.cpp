@@ -31,7 +31,7 @@ namespace itv {
 // An empty domain yields empty; a zero-only domain yields the -inf point with
 // default floating LSB, since a finite precision cannot be inferred there.
 // Public API: numeric log10 image on its valid domain. In double precision,
-// MPFR encloses endpoint values and interior extrema; other precisions retain
+// the native kernel encloses endpoints and extrema; other precisions retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::Log10Bounds(const interval& x) const
 {

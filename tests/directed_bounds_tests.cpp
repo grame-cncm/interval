@@ -1,71 +1,13 @@
-#include <bit>
 #include <cfenv>
 #include <cmath>
-#include <cstdint>
 #include <limits>
-#include <mpfr.h>
-#include <random>
 
 #include "interval/check.hh"
 #include "interval/interval_algebra.hh"
 #include "interval/affine_ops.hh"
+#include "interval/directed_rounding.hh"
 
 using namespace itv;
-
-namespace {
-
-// A 256-bit directed oracle is independent of the implementation's 53-bit
-// evaluation. Checking both sides of its enclosure avoids trusting one rounded
-// high-precision approximation, especially for enormous or subnormal results.
-class Reference {
-   public:
-    mpfr_t a, b, lo, hi;
-    Reference() { mpfr_inits2(256, a, b, lo, hi, (mpfr_ptr)nullptr); }
-    ~Reference() { mpfr_clears(a, b, lo, hi, (mpfr_ptr)nullptr); }
-    Reference(const Reference&) = delete;
-    Reference& operator=(const Reference&) = delete;
-
-    bool enclosed(const interval& result) const
-    {
-        return !result.isEmpty() && mpfr_cmp_d(lo, result.lo()) >= 0 &&
-               mpfr_cmp_d(hi, result.hi()) <= 0;
-    }
-};
-
-using BinaryReference = int (*)(mpfr_ptr, mpfr_srcptr, mpfr_srcptr, mpfr_rnd_t);
-using BinaryMethod = interval (interval_algebra::*)(const interval&, const interval&) const;
-using UnaryReference = int (*)(mpfr_ptr, mpfr_srcptr, mpfr_rnd_t);
-using UnaryMethod = interval (interval_algebra::*)(const interval&) const;
-
-bool checkBinary(const interval_algebra& algebra, Reference& ref, BinaryMethod method,
-                 BinaryReference operation, double x, double y)
-{
-    mpfr_set_d(ref.a, x, MPFR_RNDN);
-    mpfr_set_d(ref.b, y, MPFR_RNDN);
-    operation(ref.lo, ref.a, ref.b, MPFR_RNDD);
-    operation(ref.hi, ref.a, ref.b, MPFR_RNDU);
-    return ref.enclosed((algebra.*method)(interval(x, x, -24), interval(y, y, -24)));
-}
-
-bool checkUnary(const interval_algebra& algebra, Reference& ref, UnaryMethod method,
-                UnaryReference operation, double x)
-{
-    mpfr_set_d(ref.a, x, MPFR_RNDN);
-    operation(ref.lo, ref.a, MPFR_RNDD);
-    operation(ref.hi, ref.a, MPFR_RNDU);
-    return ref.enclosed((algebra.*method)(interval(x, x, -24)));
-}
-
-// Finite binary64 bit patterns exercise every exponent, unlike a uniform real
-// distribution which almost never reaches cancellation or gradual underflow.
-double finiteSample(std::mt19937_64& random)
-{
-    uint64_t bits;
-    do { bits = random(); } while ((bits & UINT64_C(0x7ff0000000000000)) == UINT64_C(0x7ff0000000000000));
-    return std::bit_cast<double>(bits);
-}
-
-}  // namespace
 
 int main()
 {
@@ -114,51 +56,37 @@ int main()
     check("double: directed composition encloses the FMA cancellation result", true,
           contracted.has(std::fma(a, b, -1)) && contracted.lo() < 0);
 
-    // Compare all elementary endpoints against a certified wider enclosure.
-    Reference ref;
-    std::mt19937_64 random(0x1a7e4ba1);
-    for (const auto& entry : {
-             std::pair<BinaryMethod, BinaryReference>{&interval_algebra::Add, mpfr_add},
-             {&interval_algebra::Sub, mpfr_sub}, {&interval_algebra::Mul, mpfr_mul},
-             {&interval_algebra::Div, mpfr_div}}) {
-        bool enclosed = true;
-        for (int i = 0; i < 4000 && enclosed; ++i) {
-            const double x = finiteSample(random), y = finiteSample(random);
-            if (y == 0 && entry.first == &interval_algebra::Div) continue;
-            enclosed = checkBinary(algebra, ref, entry.first, entry.second, x, y);
-        }
-        check("double: elementary operation encloses 4000 MPFR references", true, enclosed);
-    }
+    // A floating product residual may underflow to zero even when the product
+    // is inexact. Exact significand comparisons must retain the neighbouring bit.
+    check("double: positive inexact subnormal product is bracketed", true,
+          algebra.Mul(interval(tiny, tiny, -1074), interval(0.75)) == interval(0, tiny));
+    check("double: negative inexact subnormal product is bracketed", true,
+          algebra.Mul(interval(-tiny, -tiny, -1074), interval(0.75)) == interval(-tiny, 0));
+    check("double: an exact subnormal product stays a singleton", true,
+          algebra.Mul(interval(2 * tiny, 2 * tiny, -1074), interval(0.5)).is(tiny));
+    check("double: an exact subnormal quotient stays a singleton", true,
+          algebra.Div(interval(2 * tiny, 2 * tiny, -1074), interval(2, 2, -24)).is(tiny));
+    check("double: negative overflow keeps max-finite above -inf", true,
+          algebra.Mul(interval(-largest, -largest, -24), interval(2, 2, -24))
+              == interval(-HUGE_VAL, -largest));
+    check("double: exact transcendental identities stay points", true,
+          algebra.SinBounds(interval(0)).is(0) && algebra.CosBounds(interval(0)).is(1) &&
+          algebra.ExpBounds(interval(0)).is(1) && algebra.LogBounds(interval(1)).is(0));
+    check("double: large singleton trig inputs use an explicit conservative fallback", true,
+          algebra.SinBounds(interval(1e100)) == interval(-1, 1) &&
+          algebra.CosBounds(interval(1e100)) == interval(-1, 1));
+    check("double: fmod with a huge quotient is exactly representable", true,
+          algebra.Fmod(interval(largest), interval(3 * tiny)).is(2 * tiny));
+    using namespace itv::detail;
+    check("double: scalar IEEE remainder uses ties-to-even", true,
+          directedBinary(BinaryOp::Remainder, 3, 2, Direction::Down) == -1 &&
+          directedBinary(BinaryOp::Remainder, 5, 2, Direction::Up) == 1 &&
+          directedBinary(BinaryOp::Remainder, -3, 2, Direction::Up) == 1);
 
-    const struct UnaryCase { const char* name; UnaryMethod method; UnaryReference reference; } cases[] = {
-        {"sqrt", &interval_algebra::Sqrt, mpfr_sqrt},
-        {"acos", &interval_algebra::AcosBounds, mpfr_acos},
-        {"acosh", &interval_algebra::AcoshBounds, mpfr_acosh},
-        {"asin", &interval_algebra::AsinBounds, mpfr_asin},
-        {"asinh", &interval_algebra::AsinhBounds, mpfr_asinh},
-        {"atan", &interval_algebra::AtanBounds, mpfr_atan},
-        {"atanh", &interval_algebra::AtanhBounds, mpfr_atanh},
-        {"cos", &interval_algebra::CosBounds, mpfr_cos},
-        {"cosh", &interval_algebra::CoshBounds, mpfr_cosh},
-        {"exp", &interval_algebra::ExpBounds, mpfr_exp},
-        {"log", &interval_algebra::LogBounds, mpfr_log},
-        {"log10", &interval_algebra::Log10Bounds, mpfr_log10},
-        {"sin", &interval_algebra::SinBounds, mpfr_sin},
-        {"sinh", &interval_algebra::SinhBounds, mpfr_sinh},
-        {"tan", &interval_algebra::TanBounds, mpfr_tan},
-        {"tanh", &interval_algebra::TanhBounds, mpfr_tanh}
-    };
-    for (const auto& entry : cases) {
-        bool enclosed = true;
-        for (double x : {-largest, -1e100, -10.0, -1.0, -0.5, -tiny, 0.0,
-                         tiny, 0.5, 1.0, 2.0, 10.0, 1e100, largest}) {
-            mpfr_set_d(ref.a, x, MPFR_RNDN);
-            entry.reference(ref.lo, ref.a, MPFR_RNDD);
-            if (mpfr_nan_p(ref.lo)) continue; // check numeric values on valid domains
-            enclosed = enclosed && checkUnary(algebra, ref, entry.method, entry.reference, x);
-        }
-        check(std::string("double: ") + entry.name + " encloses MPFR at boundary arguments", true, enclosed);
-    }
+    check("double: known positive images survive tiny reference calculations", true,
+          algebra.AtanBounds(interval(0, tiny)).lo() >= 0 &&
+          algebra.AsinBounds(interval(0, tiny)).lo() >= 0 &&
+          algebra.LogBounds(interval(1, nextOne)).lo() >= 0);
 
     // Periodic range decisions must use pi enclosures, not rounded fmod phases.
     const double pi = std::acos(-1.0), halfPi = pi / 2;
@@ -193,20 +121,16 @@ int main()
     check("double: remainder half-divisor underflow rounds outward", true,
           algebra.Remainder(interval(-tiny, tiny), interval(tiny, tiny, -24)).has(tiny));
 
-    // Chord coefficients and their evaluation can themselves round inward.
-    // Check an exact rational t/T against both directed affine bounds.
+    // A rational chord must contain the correctly-rounded t/10 values even
+    // when coefficient evaluation introduces a second rounding.
     double lower0, lower1, upper0, upper1;
     achord(0, 1, 10, lower0, lower1);
     achord(0, 1, 10, upper0, upper1, true);
     AffItv chord{lower0, lower1, upper0, upper1, -24};
     bool chordContains = true;
-    for (int t = 0; t <= 10; ++t) {
-        mpfr_set_si(ref.a, t, MPFR_RNDN);
-        mpfr_div_ui(ref.lo, ref.a, 10, MPFR_RNDD);
-        mpfr_div_ui(ref.hi, ref.a, 10, MPFR_RNDU);
-        chordContains = chordContains && ref.enclosed(interval(chord.lo(t), chord.hi(t)));
-    }
-    check("double: affine chord encloses exact rational interpolation", true, chordContains);
+    for (int t = 0; t <= 10; ++t)
+        chordContains = chordContains && interval(chord.lo(t), chord.hi(t)).has(double(t) / 10);
+    check("double: affine chord encloses rational interpolation", true, chordContains);
     affine_algebra affine(10);
     const AffItv affineSum = affine.Add(fromItv(interval(1, 1, -24)),
                                         fromItv(interval(0x1p-54)));
@@ -223,26 +147,19 @@ int main()
           toItv(affine.Add(fromItv(interval(HUGE_VAL)),
                           fromItv(interval(-HUGE_VAL, 0))), 10).has(HUGE_VAL));
 
-    // Changing the host rounding mode must neither invalidate the MPFR bounds
-    // nor be an observable side effect of an interval operation.
+#ifndef __EMSCRIPTEN__
+    // The kernel never changes a caller's rounding mode. The quotient endpoints
+    // still enclose exact 1/10 with any supported IEEE rounding direction.
     const int saved = std::fegetround();
     for (int rounding : {FE_DOWNWARD, FE_UPWARD, FE_TOWARDZERO, FE_TONEAREST}) {
         std::fesetround(rounding);
+        const interval result = algebra.Div(interval(1, 1, -24), interval(10, 10, -24));
         check("double: inclusion and host rounding mode are preserved", true,
-              checkBinary(algebra, ref, &interval_algebra::Div, mpfr_div, 1, 10) &&
+              result.lo() <= std::nextafter(0.1, 0.0) && result.hi() >= 0.1 &&
               std::fegetround() == rounding);
     }
     std::fesetround(saved);
-
-    const mpfr_exp_t savedMin = mpfr_get_emin(), savedMax = mpfr_get_emax();
-    mpfr_set_emin(-50);
-    mpfr_set_emax(50);
-    const interval restricted = algebra.Div(interval(tiny, tiny, -24), interval(2, 2, -24));
-    check("double: a restricted caller MPFR range gives a safe fallback", true,
-          restricted.lo() == -HUGE_VAL && restricted.hi() == HUGE_VAL &&
-          mpfr_get_emin() == -50 && mpfr_get_emax() == 50);
-    mpfr_set_emin(savedMin);
-    mpfr_set_emax(savedMax);
+#endif
     libmCompensation() = true;
     return reportCheckResults();
 }

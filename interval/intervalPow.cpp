@@ -197,7 +197,7 @@ interval interval_algebra::PowBounds(const interval& x, const interval& y) const
 
     if (programPrecision() == 2) {
         // Preserve the established grid estimate for bounded integer exponents;
-        // their endpoint powers are now themselves evaluated with directed MPFR.
+        // their endpoint powers are now themselves evaluated with outward arithmetic.
         if (y.lsb() >= 0 && y.lo() >= 0 && y.hi() <= INT32_MAX &&
             std::isfinite(x.lo()) && std::isfinite(x.hi())) return iPow(x, y);
         return detail::doublePowBounds(x, y);

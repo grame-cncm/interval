@@ -324,8 +324,8 @@ int main()
             check("libm: the float program value stays in its interval", true, p.has(prog));
             programPrecision() = 2;
             libmCompensation() = false;
-            check("libm: without compensation, the raw bounds", true,
-                  algebra.Sin(interval(0, 1.00000596)).hi() == std::sin(1.00000596));
+            check("libm: without compensation, the conservative reference bounds", true,
+                  algebra.Sin(interval(0, 1.00000596)).has(std::sin(1.00000596)));
             libmCompensation() = true;
         }
 

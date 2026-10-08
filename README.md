@@ -58,7 +58,7 @@ range:
 - **Target-libm compensation** uses `itv::libmCompensation()`, enabled by default.
   The historical margin is two ULPs of the program precision, clipped to known
   function images. It is an assumption, not a universal bound for arbitrary
-  libms. In double mode, the reference calculation uses MPFR even when this
+  libms. In double mode, the reference calculation uses the native kernel even when this
   compensation is disabled; computed singletons no longer bypass the margin.
   The other modes retain their previous singleton exemption and host-libm
   evaluation, which need a separate audit.
@@ -70,52 +70,105 @@ remaining obligations.
 
 ## Conservative binary64 bound calculations
 
-With `itv::programPrecision() == 2`, numerical bounds are evaluated with MPFR in
-the required direction and converted to binary64 in the same direction. This
-covers the analyzer's own rounding error: if the desired lower bound belongs to
-`[L-, L+]` and the upper bound to `[U-, U+]`, the retained interval is `[L-, U+]`.
-It is not enough to widen only the final result after intermediate calculations
-have already rounded inward. See [MPFR's rounding contract](https://www.mpfr.org/mpfr-current/mpfr.html#Rounding).
+With `itv::programPrecision() == 2`, the native kernel computes outward binary64
+bounds **without MPFR/GMP**. This covers the analyzer's own rounding error: if the
+desired lower bound belongs to `[L-, L+]` and the upper bound to `[U-, U+]`, the
+retained interval is `[L-, U+]`. It is not enough to widen only the final result
+after intermediate calculations have already rounded inward.
 
-The directed kernel covers floating addition, subtraction, multiplication,
-division, reciprocal, square root, powers, and the reference images exposed by
-the `*Bounds` mathematical functions. Trigonometric extrema and tangent poles
-are located using enclosing values of pi rather than host-libm argument
-reduction. `fmod` avoids approximate quotient-to-int conversion; `remainder`
-rounds half-divisor bounds outward. Affine coefficient arithmetic, line
-evaluation, chords, shifts, and inclusion comparisons use the same kernel.
-Integer operations retain their int32 wrapping contract.
+The elementary kernel uses TwoSum for nearest-rounded addition/subtraction and
+exact comparisons of binary significands for multiplication, division, square
+root, and power-of-two scaling. A product needs only two 64-bit integer limbs,
+not a multiprecision library or hardware FMA. These comparisons remain valid
+when a floating residual would underflow to zero. The rounded result is moved
+by one `nextafter` only when the requested direction requires it. Non-nearest
+addition/subtraction instead use a conservative neighbour fallback.
+
+The `*Bounds` transcendental reference images use interval polynomial/series
+calculations with analytic remainder bounds, independently of the host libm:
+
+- `exp`: reduce by enclosing `ln(2)`, sum through degree 32 on `|r| <= 1`,
+  bound the tail by three times the absolute degree-33 term, then scale outward.
+- `log`: exact `frexp` reduction to `m` in `[1, 2)`, then 32 terms of the
+  atanh series in `z = (m-1)/(m+1)`. Bound the remaining positive tail by
+  `2*z^65 / (65*(1-z^2))` using outward arithmetic.
+- `atan`: reciprocal/quadrant identities reduce to `|z| <= 1/2`; the 32-term
+  alternating series has a tail bounded by its first omitted term.
+- `sin`/`cos`: reduce with an enclosing pi and a bounded integer quadrant,
+  evaluate 16 Taylor terms on `|r| <= 1`, and bound the alternating tail by
+  the first omitted term. `tan` divides these images; inverse/hyperbolic
+  functions use identities built from the same reference bounds.
+- Integer powers use outward exponentiation by squaring; other powers use
+  enclosing logarithms and exponentials. `log10` divides by an enclosing `ln(10)`.
+
+These are conservative reference algorithms, **not correctly-rounded libm
+replacements**. Bounds can span several ULPs and cancellation can widen them
+further. Trigonometric arguments with magnitude greater than `2^20`, or an
+uncertain reduction, use the full function image (`[-1, 1]` or an unrestricted
+tangent corridor). Extrema and tangent poles are tested using enclosing pi
+quotients; uncertain large phases deliberately include critical points.
+
+`fmod`/`remainder` scalar values use exact binary shift/subtract division,
+including huge quotients and ties-to-even. Interval remainder bounds round
+half-divisors outward. Affine coefficients, line evaluation, chords, shifts,
+and inclusion comparisons use the same elementary kernel. Integer operations
+retain their int32 wrapping contract.
 
 An injected literal is already a known machine value: `FloatNum(0.1)` remains a
-singleton. `FloatNum` also preserves the floating nature of integral-looking
-literals, so `FloatNum(65536) * FloatNum(65536)` does not take the int32 path.
-An exact operation such as `0.5 * 0.25` remains a singleton too. An inexact
-operation such as `1 + 2^-54` is enclosed by `[1, nextafter(1, +inf)]`; a rounded
-equality of endpoints must not create a false constant.
+singleton. `FloatNum` preserves the floating nature of integral-looking literals,
+so `FloatNum(65536) * FloatNum(65536)` does not take the int32 path. Exact
+operations such as `0.5 * 0.25` remain singletons. An inexact operation such as
+`1 + 2^-54` is enclosed by `[1, nextafter(1, +inf)]`; a rounded equality of
+endpoints must not create a false constant. Exact transcendental identities
+such as `sin(0)`, `exp(0)` and `log(1)` also remain points.
 
 This is the first step towards a reliable computational analysis. It does not
 certify arbitrary target libms or reassociation, add separate NaN/signed-zero
 tracking, prove recurrence invariants, or certify the LSB precision estimates.
-Those obligations need separate verification before bounds justify safety decisions. The
-single/quad/fixed paths retain their previous rules and need their own audit.
-The MPFR path is a reference implementation; its performance is not yet measured.
+Those obligations need separate verification before bounds justify safety
+decisions. The single/quad/fixed paths retain their previous rules and need
+their own audit. The new transcendental reference is intended for inclusion;
+its performance and tightness in the complete Faust compiler need measurement.
 
-## Build dependencies
+## Building and optional MPFR oracle
 
-MPFR and GMP development files are required. Install `libmpfr-dev libgmp-dev` on
-Debian/Ubuntu, `mpfr` through Homebrew or MacPorts on macOS, or `mpfr:x64-windows`
-through vcpkg on Windows. Configure with `CMAKE_PREFIX_PATH` when the installation
-is outside the normal search paths; Windows builds use the vcpkg CMake toolchain.
-MPFR/GMP retain their own licenses when linked with this Apache-licensed project.
+A normal build needs a C++20 compiler and CMake, with **no MPFR/GMP dependency**:
+
+```sh
+cmake -S . -B build -DNOTIDY=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Enable the independent 256-bit MPFR oracle explicitly:
+
+```sh
+cmake -S . -B build-oracle -DNOTIDY=ON -DINTERVAL_ENABLE_MPFR_TESTS=ON
+cmake --build build-oracle
+ctest --test-dir build-oracle --output-on-failure
+```
+
+Only `MPFROracleTests` links MPFR/GMP; the library and both ordinary test
+executables remain independent of them. For this optional test, install
+`libmpfr-dev libgmp-dev` on Debian/Ubuntu, `mpfr` through Homebrew or MacPorts on
+macOS, or `mpfr:x64-windows` through vcpkg on Windows. Use `CMAKE_PREFIX_PATH`
+for a nonstandard installation or the vcpkg CMake toolchain on Windows. An
+explicit oracle request fails if its dependencies are unavailable.
+
+For WebAssembly, with Emscripten and Node available:
+
+```sh
+emcmake cmake -S . -B build-wasm -DNOTIDY=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-wasm
+ctest --test-dir build-wasm --output-on-failure
+```
 
 The CMake target disables fast-math and implicit contraction for the analyzer
 and its header-based helpers. Direct consumers must preserve this compilation
-contract as well. The kernel does not change the CPU rounding mode or the
-caller's MPFR exponent range. If that range cannot represent binary64 inputs,
-the kernel returns unrestricted numeric bounds instead of loading them inexactly.
-Host comparisons and interval construction require IEEE gradual underflow
-(FTZ/DAZ disabled in the analyzer); target FTZ/DAZ remains a separate model.
-Concurrent calls require a thread-safe MPFR build or caller serialization.
+contract as well. The kernel does not change the CPU rounding mode and has no
+mutable numerical state. IEEE gradual underflow is required (FTZ/DAZ disabled
+in the analyzer); target FTZ/DAZ remains a separate model. Only the optional
+oracle needs a thread-safe MPFR build or caller serialization if used concurrently.
 
 ## Special intervals
 

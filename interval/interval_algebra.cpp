@@ -23,7 +23,7 @@
 namespace itv {
 
 //------------------------------------------------------------------------------------------
-// Public numeric functions: *Bounds computes the reference image (directed MPFR
+// Public numeric functions: *Bounds computes the reference image (native outward bounds
 // in double mode); libmBounds then adds the historical two-ULP target margin.
 // This empirical margin does not certify an arbitrary target libm. A caller can
 // inspect the reference through *Bounds independently of libmCompensation.

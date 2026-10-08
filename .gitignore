@@ -44,5 +44,8 @@ testinterval
 # cmake
 build/**
 build-directed*/
+build-native*/
+build-oracle*/
+build-wasm*/
 
 todo

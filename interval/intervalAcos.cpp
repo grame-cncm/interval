@@ -30,7 +30,7 @@ namespace itv {
 static const interval AcosDomain(-1, 1, 0);  // this interval needs 0 digits of precision
 
 // Public API: numeric acos image on its valid domain. In double precision,
-// MPFR encloses endpoint values and interior extrema; other precisions retain
+// the native kernel encloses endpoints and extrema; other precisions retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::AcosBounds(const interval& x) const
 {

@@ -21,21 +21,9 @@ file(GLOB INTERVAL_SOURCES CONFIGURE_DEPENDS interval/*.cpp)
 add_library(interval STATIC ${INTERVAL_SOURCES})
 target_include_directories(interval PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/FaustAlgebra)
 
-# Directed binary64 bounds use MPFR as a portable reference implementation.
-# Fail explicitly rather than silently falling back to nearest-rounded bounds.
-find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND)
-    pkg_check_modules(PC_MPFR QUIET mpfr)
-endif()
-find_path(MPFR_INCLUDE_DIR mpfr.h HINTS ${PC_MPFR_INCLUDE_DIRS})
-find_path(GMP_INCLUDE_DIR gmp.h HINTS ${PC_MPFR_INCLUDE_DIRS})
-find_library(MPFR_LIBRARY NAMES mpfr libmpfr HINTS ${PC_MPFR_LIBRARY_DIRS})
-find_library(GMP_LIBRARY NAMES gmp libgmp HINTS ${PC_MPFR_LIBRARY_DIRS})
-if(NOT MPFR_INCLUDE_DIR OR NOT GMP_INCLUDE_DIR OR NOT MPFR_LIBRARY OR NOT GMP_LIBRARY)
-    message(FATAL_ERROR "Conservative double bounds require MPFR and GMP development files. Set CMAKE_PREFIX_PATH to their installation prefix.")
-endif()
-target_include_directories(interval PRIVATE ${MPFR_INCLUDE_DIR} ${GMP_INCLUDE_DIR})
-target_link_libraries(interval PUBLIC ${MPFR_LIBRARY} ${GMP_LIBRARY})
+# Production code has no multiprecision dependency. MPFR is an explicit opt-in
+# test oracle; a normal or cross-compiled build never searches for host packages.
+option(INTERVAL_ENABLE_MPFR_TESTS "Check bounds against an independent MPFR oracle" OFF)
 
 # The interval algebra models signed 32-bit integer overflow as two's-complement
 # wrapping. GCC and Clang must compile the corresponding signed arithmetic with
@@ -60,12 +48,28 @@ target_link_libraries(TestInterval PRIVATE interval)
 add_executable(IntervalTests tests/interval_tests.cpp)
 target_link_libraries(IntervalTests PRIVATE interval)
 
-# A wider-precision oracle checks directed bounds independently of their 53-bit
-# implementation, including exact counterexamples and exceptional endpoints.
+# Boundary regressions remain available without external numerical libraries.
 add_executable(DirectedBoundsTests tests/directed_bounds_tests.cpp)
-target_include_directories(DirectedBoundsTests PRIVATE ${MPFR_INCLUDE_DIR} ${GMP_INCLUDE_DIR})
 target_link_libraries(DirectedBoundsTests PRIVATE interval)
 
 enable_testing()
 add_test(NAME interval_unit_tests COMMAND IntervalTests)
 add_test(NAME directed_bounds_tests COMMAND DirectedBoundsTests)
+
+if(INTERVAL_ENABLE_MPFR_TESTS)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(PC_MPFR QUIET mpfr)
+    endif()
+    find_path(MPFR_INCLUDE_DIR mpfr.h HINTS ${PC_MPFR_INCLUDE_DIRS})
+    find_path(GMP_INCLUDE_DIR gmp.h HINTS ${PC_MPFR_INCLUDE_DIRS})
+    find_library(MPFR_LIBRARY NAMES mpfr libmpfr HINTS ${PC_MPFR_LIBRARY_DIRS})
+    find_library(GMP_LIBRARY NAMES gmp libgmp HINTS ${PC_MPFR_LIBRARY_DIRS})
+    if(NOT MPFR_INCLUDE_DIR OR NOT GMP_INCLUDE_DIR OR NOT MPFR_LIBRARY OR NOT GMP_LIBRARY)
+        message(FATAL_ERROR "INTERVAL_ENABLE_MPFR_TESTS requires MPFR/GMP development files. Set CMAKE_PREFIX_PATH or disable this option.")
+    endif()
+    add_executable(MPFROracleTests tests/mpfr_oracle_tests.cpp)
+    target_include_directories(MPFROracleTests PRIVATE ${MPFR_INCLUDE_DIR} ${GMP_INCLUDE_DIR})
+    target_link_libraries(MPFROracleTests PRIVATE interval ${MPFR_LIBRARY} ${GMP_LIBRARY})
+    add_test(NAME mpfr_oracle_tests COMMAND MPFROracleTests)
+endif()

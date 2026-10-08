@@ -1,0 +1,20 @@
+name: WebAssembly
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: install isolated Emscripten SDK
+      run: |
+        git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/interval-emsdk"
+        "$RUNNER_TEMP/interval-emsdk/emsdk" install 3.1.74
+        "$RUNNER_TEMP/interval-emsdk/emsdk" activate 3.1.74
+    - name: build and test without MPFR or GMP
+      run: |
+        source "$RUNNER_TEMP/interval-emsdk/emsdk_env.sh"
+        emcmake cmake -S . -B build-wasm -DNOTIDY=ON -DCMAKE_BUILD_TYPE=Release -DINTERVAL_ENABLE_MPFR_TESTS=OFF
+        cmake --build build-wasm --parallel 2
+        ctest --test-dir build-wasm --output-on-failure

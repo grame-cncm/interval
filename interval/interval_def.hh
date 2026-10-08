@@ -52,7 +52,7 @@ inline int& programPrecision()
 /**
  * Public API: legacy target-libm compensation, enabled by default. The two-ULP
  * widening is a configurable assumption, not a universal error guarantee.
- * Double reference bounds use MPFR independently of this setting; other modes
+ * Double reference bounds use the native kernel independently of this setting; other modes
  * still use the host libm. Disable only under an established target/host contract.
  */
 inline bool& libmCompensation()

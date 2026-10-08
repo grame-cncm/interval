@@ -20,7 +20,7 @@ namespace itv::detail {
 
 // Internal numerical kernel. Inputs are exact binary64 values; directed results
 // enclose the mathematical operation, including binary64 underflow and overflow.
-// MPFR evaluates and converts in the same direction without changing host fenv.
+// Exact dyadic comparisons and bounded reference series do not change host fenv.
 enum class Direction { Down, Up };
 enum class BinaryOp { Add, Sub, Mul, Div, Pow, Atan2, Fmod, Remainder };
 enum class UnaryOp {
@@ -45,6 +45,10 @@ inline int sumLSB(int a, int b)
 double directedBinary(BinaryOp op, double x, double y, Direction direction);
 double directedUnary(UnaryOp op, double x, Direction direction);
 double directedPi(Direction direction);
+
+// Internal exact power-of-two scaling, rounded outward including subnormals.
+// The exponent is a bounded internal range-reduction exponent, not arbitrary int.
+double directedScale(double x, int exponent, Direction direction);
 
 // Numeric image on the valid real domain, with outward binary64 bounds. NaN is
 // still represented by the library's historical empty convention, not tracked.

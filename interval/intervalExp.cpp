@@ -28,7 +28,7 @@ namespace itv {
 // void testExp();
 
 // Public API: numeric exp image on its valid domain. In double precision,
-// MPFR encloses endpoint values and interior extrema; other precisions retain
+// the native kernel encloses endpoints and extrema; other precisions retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::ExpBounds(const interval& x) const
 {

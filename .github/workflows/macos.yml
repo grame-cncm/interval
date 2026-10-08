@@ -3,22 +3,27 @@ name: macOS
 on:
   push:
     branches: 
-      - '*'
+      - '**'
   pull_request:
     branches: 
-      - '*'
+      - '**'
 
 jobs:
   build:
+
+    strategy:
+      matrix:
+        mpfr: ["OFF", "ON"]
 
     runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v3
-    - name: install directed-rounding dependencies
+    - name: install optional oracle dependencies
+      if: matrix.mpfr == 'ON'
       run: brew install mpfr
     - name: create cmake project
-      run: cmake -DNOTIDY=ON -DCMAKE_PREFIX_PATH="$(brew --prefix)" -B build -S .
+      run: cmake -DNOTIDY=ON -DINTERVAL_ENABLE_MPFR_TESTS=${{ matrix.mpfr }} -DCMAKE_PREFIX_PATH="$(brew --prefix)" -B build -S .
     - name: build cmake project
       run: cmake --build build/ --target all
     - name: execute tests

@@ -2,23 +2,34 @@ These notes on testing the intervals results are destined to future library cont
 
 # Test suites
 
-The project has three complementary executables:
+The project has three dependency-free executables and an optional oracle:
 
 - `IntervalTests` contains fast, deterministic regression tests. It checks interval bounds and
   LSB values strictly and is the suite executed by CTest and CI.
 - `TestInterval` is an experimental numerical-analysis program. It can run large sampled studies
   of interval operations and is not part of the default CTest suite.
-- `DirectedBoundsTests` checks conservative double bounds against a 256-bit MPFR
-  oracle. It covers half-ULP errors, false singleton underflow, overflow, exact
-  constants, transcendental domains, periodic extrema/poles, affine interpolation,
-  and preservation of the host rounding mode. It is executed by CTest and CI.
+- `DirectedBoundsTests` contains dependency-free rounding regressions, including
+  half-ULP errors, false singleton underflow, overflow, exact constants, poles,
+  affine interpolation, and preservation of the host rounding mode. It also runs
+  under Emscripten/Node (WebAssembly has a fixed rounding mode).
+- `MPFROracleTests`, built only with `INTERVAL_ENABLE_MPFR_TESTS=ON`, compares
+  native bounds against independent 256-bit directed MPFR calculations. Fixed
+  seeds cover all binary exponents and ordinary arguments for elementary and
+  transcendental functions, exact modulo/remainder, powers, scaling and interval
+  images. MPFR is linked to this test executable, never to the interval library.
 
-Install the MPFR and GMP development dependencies described in README.md first.
+No external numerical library is required for the default tests. For the oracle,
+install the MPFR/GMP development files described in README.md and add
+`-DINTERVAL_ENABLE_MPFR_TESTS=ON` when configuring a separate build directory.
+CTest runs the oracle when it is built. CI checks both dependency-free and oracle
+configurations, and also executes the default tests in WebAssembly under Node.
+An oracle comparison detects implementation errors; it does not replace the
+analytic inclusion arguments and assumptions documented in README.md/source.
 
 Configure, build and run the regression suite with:
 
 ```sh
-cmake -S . -B build
+cmake -S . -B build -DNOTIDY=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```

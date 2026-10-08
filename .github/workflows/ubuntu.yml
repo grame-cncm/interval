@@ -3,22 +3,27 @@ name: Ubuntu
 on:
   push:
     branches: 
-      - '*'
+      - '**'
   pull_request:
     branches: 
-      - '*'
+      - '**'
 
 jobs:
   build:
+
+    strategy:
+      matrix:
+        mpfr: ["OFF", "ON"]
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
-    - name: install directed-rounding dependencies
+    - name: install optional oracle dependencies
+      if: matrix.mpfr == 'ON'
       run: sudo apt-get update && sudo apt-get install -y libmpfr-dev libgmp-dev
     - name: create cmake project
-      run: cmake -B build -S .
+      run: cmake -B build -S . -DNOTIDY=ON -DINTERVAL_ENABLE_MPFR_TESTS=${{ matrix.mpfr }}
     - name: build cmake project
       run: cmake --build build/ --target all
     - name: execute tests
