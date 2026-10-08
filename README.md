@@ -22,6 +22,91 @@ Herrou, Stéphane Letz.
   fractional bits from the lsb analysis, so a tighter interval converts directly into
   signal-to-noise ratio. See BACKGROUND.md and PRECISION.md.
 
+## Correctness criterion (normative)
+
+**Every interval implementation must satisfy the following inclusion and
+validity requirements.** They define the mathematical result to approximate,
+independently of the algorithm used to compute it.
+
+For a unary operation, let:
+
+- `X` denote the set of numeric values represented by the input interval;
+- `b_X` denote its `mayBeInvalid` flag;
+- `F` denote the operation under the chosen numeric contract;
+- `D` denote its admissible domain: inputs for which `F` is defined and produces
+  no NaN;
+- `S` denote the permitted representable bounds, for example binary32 or binary64
+  values, completed with negative and positive infinity. NaN is not a bound.
+
+The contract fixes the meaning of `F` and `D`, including numeric types,
+rounding, wrapping and conversions. Thus `F` need not be an exact real-valued
+mathematical function. Any further restriction, such as excluding infinite
+results, must also be part of this contract.
+
+Define the projections onto representable bounds by:
+
+$$
+\lfloor a\rfloor_S = \max\{s\in S\mid s\le a\},
+\qquad
+\lceil a\rceil_S = \min\{s\in S\mid s\ge a\}.
+$$
+
+The set of valid results and its ideal enclosure are:
+
+$$
+V = \{F(x)\mid x\in X\cap D\},
+$$
+
+$$
+Y =
+\begin{cases}
+\varnothing & \text{if } V=\varnothing,\\
+[\lfloor\inf V\rfloor_S,\;\lceil\sup V\rceil_S] & \text{otherwise}.
+\end{cases}
+$$
+
+`Y` is the smallest interval with bounds in `S` containing every valid result.
+The validity rule retains input invalidity and records inputs outside the domain:
+
+$$
+b_Y = b_X \lor (X\setminus D\ne\varnothing).
+$$
+
+If an implementation returns an interval $\widehat Y$ and a flag
+$\widehat b_Y$, **its correctness criterion is**:
+
+$$
+Y\subseteq\widehat Y,
+\qquad
+b_Y\Rightarrow\widehat b_Y.
+$$
+
+An implementation may return a wider interval or conservatively report a
+possible invalidity. It must never exclude a required value or report `false`
+when the validity rule requires `true`. Failure to establish domain membership
+must not be silently treated as proof of validity.
+
+Empty numeric bounds with a true flag describe possible invalid execution with
+no valid numeric result. They are distinct from an empty set of possibilities
+with a false flag. Numerical enclosure alone cannot erase an invalidity.
+
+For operations with several arguments, use the set of possible argument tuples
+(the Cartesian product when only separate intervals are known), intersect it
+with the joint domain `D`, and combine input flags with OR. Checking each
+argument independently is not sufficient for restrictions such as `0 / 0` or
+`0 * infinity`.
+
+For Faust, certifying an index requires both a false invalidity flag and a
+numeric enclosure entirely inside its admissible integer range. A dangerous or
+uncertified index must be rejected with a diagnostic; silently clamping it does
+not satisfy that validation policy.
+
+**This section specifies the required contract, not a claim that the current
+implementation fully satisfies it.** The separate `mayBeInvalid` field is not
+implemented yet. NaN tracking, invalid conversions, target-libm guarantees and
+recurrence verification remain obligations described below. The integer nature
+convention remains `lsb >= 0`; the validity flag is independent of `lsb`.
+
 ## Two layers
 
 1. **Ordinary intervals** (`interval_def.hh`, `interval_algebra.hh`): a triplet
