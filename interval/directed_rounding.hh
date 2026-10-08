@@ -47,7 +47,7 @@ inline bool hasInt32Bounds(const interval& x)
 inline interval int32Hull(const interval& x)
 {
     if (x.isEmpty() || x.lsb() < 0 || hasInt32Bounds(x)) return x;
-    return {-2147483648.0, 2147483647.0, x.lsb()};
+    return {-2147483648.0, 2147483647.0, x.lsb(), x.mayBeInvalid()};
 }
 
 // Normalize each integer even in a mixed expression: conversion to floating
@@ -68,7 +68,7 @@ inline interval floatingOperand(const interval& input)
 {
     const interval x = int32Hull(input);
     return x.isEmpty() || x.lsb() < 0 ? x
-        : interval(programBound(x.lo()), programBound(x.hi()), -24);
+        : interval(programBound(x.lo()), programBound(x.hi()), -24, x.mayBeInvalid());
 }
 
 // Comparisons and min/max convert both operands when either is floating. Pure

@@ -132,10 +132,10 @@ interval positiveFMod(const interval& x, const interval& y)
 }
 
 // fmod of two signed intervals
-// Public API: integer C modulo for integer operands, otherwise numeric fmod.
+// Numeric kernel: integer C modulo for integer operands, otherwise numeric fmod.
 // Float/double floating bounds avoid rounded quotient tests and unsafe int casts;
-// invalid-only domains yield empty and NaN is not represented separately.
-interval interval_algebra::Mod(const interval& xIn, const interval& yIn) const
+// Invalid-only domains yield empty; validity is attached by the public transfer.
+interval interval_algebra::numericMod(const interval& xIn, const interval& yIn) const
 {
     const auto [x, y] = detail::int32Operands(xIn, yIn);
     if (x.isEmpty() || y.isEmpty()) {
@@ -185,9 +185,9 @@ interval interval_algebra::Mod(const interval& xIn, const interval& yIn) const
 // fmod carries the modulo semantics this file already computes : the two differ by
 // their NATURE (fmod is real whatever its operands, `%` on integers is an integer),
 // which is not an interval's business.
-// Public API: floating modulo; in float/double, even integer-looking inputs
-// follow fmod rather than C integer modulo. NaN is not tracked separately.
-interval interval_algebra::Fmod(const interval& x, const interval& y) const
+// Numeric kernel: floating modulo; in float/double, even integer-looking inputs
+// follow fmod rather than C integer modulo. Validity is attached by the public transfer.
+interval interval_algebra::numericFmod(const interval& x, const interval& y) const
 {
     if (detail::usesNativeBounds()) return detail::doubleFmodBounds(x, y);
     return Mod(x, y);

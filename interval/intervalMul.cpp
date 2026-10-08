@@ -41,10 +41,10 @@ static double specialmultint(double a, double b)
     return ((a == 0.0) || (b == 0.0)) ? 0.0 : (int)a * (int)b;
 }
 
-// Public API: enclose multiplication; float/double floating corners round outward.
+// Numeric kernel: enclose multiplication; float/double floating corners round outward.
 // Zero times an unbounded endpoint keeps the historical numeric-hull convention;
-// possible NaN values are not represented separately by this interval type.
-interval interval_algebra::Mul(const interval& xIn, const interval& yIn) const
+// the public transfer additionally marks possible NaN values.
+interval interval_algebra::numericMul(const interval& xIn, const interval& yIn) const
 {
     const auto [x, y] = detail::int32Operands(xIn, yIn);
     if (x.isEmpty() || y.isEmpty()) {

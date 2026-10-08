@@ -98,13 +98,13 @@ WebAssembly. Aucun contre-exemple restant n’a été identifié dans ces tests.
 Cela ne constitue pas une certification complète. Les limites déjà documentées
 dans le [README](../../README.md) restent à traiter :
 
-- NaN n’est pas représenté par un indicateur de valeur possible séparé. Un
-  intervalle numérique ne suffit donc pas à certifier qu’un résultat est défini.
-- `IntCast` renvoie tout int32 lorsque son entrée peut sortir de cette plage.
-  Cette enveloppe couvre les comportements matériels considérés, mais ne rend
-  pas défini un cast C++ hors plage. La validité de la conversion doit être
-  établie séparément avant de certifier un indice ; il manque une représentation
-  explicite de cette impossibilité de certifier.
+- La bibliothèque porte désormais `mayBeInvalid`, qui signale notamment les NaN
+  possibles et les conversions hors plage. Faust doit préserver cet attribut
+  dans son propre domaine et le consulter avant de certifier un indice.
+- `IntCast` conserve les résultats tronqués valides et signale les entrées
+  exclues ; une entrée uniquement invalide donne des bornes numériques vides
+  avec le flag à `true`. Ce changement ne définit pas un cast C++ hors plage
+  et ne modifie pas automatiquement le code généré par Faust.
 - La compensation libm suppose au plus deux pas représentables depuis le
   résultat correctement arrondi ; aucune garantie universelle par cible n’est
   fournie.

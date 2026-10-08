@@ -27,10 +27,10 @@ namespace itv {
 // interval Ceil(const interval& x);
 // void testCeil();
 
-// Public API: numeric ceil image; empty stays empty, and integer inputs
+// Numeric kernel: numeric ceil image; empty stays empty, and integer inputs
 // first convert to the target float. Results keep floating nature in every precision,
 // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
-interval interval_algebra::Ceil(const interval& input) const
+interval interval_algebra::numericCeil(const interval& input) const
 {
     const interval x = detail::floatingOperand(input);
     if (x.isEmpty()) {

@@ -320,8 +320,8 @@ interval doublePowBounds(const interval& xInput, const interval& yInput)
     if (x.isEmpty() || y.isEmpty()) return empty();
     const int lsb = std::min({x.lsb(), y.lsb(), -24});
     // The interval representation merges signed zero. Negative powers of -0
-    // can be -inf for odd integral exponents; keep that missing sign in float.
-    if (programPrecision() == 1 && x.hasZero() && y.lo() < 0)
+    // can be -inf for odd integral exponents; keep both signs in either precision.
+    if (x.hasZero() && y.lo() < 0)
         return {-HUGE_VAL, HUGE_VAL, lsb};
     interval result = empty();
     if (x.hi() >= 0) result = positivePower(std::max(0.0, x.lo()), x.hi(), y.lo(), y.hi(), lsb);

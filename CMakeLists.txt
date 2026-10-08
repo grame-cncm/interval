@@ -67,6 +67,12 @@ add_executable(FaustIntegrationTests tests/faust_integration_tests.cpp)
 set_target_properties(FaustIntegrationTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(FaustIntegrationTests PRIVATE interval)
 
+# Validity participates in both domains and their fixpoint ordering. C++17 is
+# retained to exercise the same public API used by the Faust compiler.
+add_executable(InvalidityTests tests/invalidity_tests.cpp)
+set_target_properties(InvalidityTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(InvalidityTests PRIVATE interval)
+
 enable_testing()
 add_test(NAME interval_unit_tests COMMAND IntervalTests)
 add_test(NAME directed_bounds_tests COMMAND DirectedBoundsTests)
@@ -75,6 +81,7 @@ set_tests_properties(float_inclusion_tests PROPERTIES LABELS "float-inclusion")
 add_test(NAME float_bounds_tests COMMAND FloatBoundsTests)
 set_tests_properties(float_bounds_tests PROPERTIES LABELS "float-inclusion")
 add_test(NAME faust_integration_tests COMMAND FaustIntegrationTests)
+add_test(NAME invalidity_tests COMMAND InvalidityTests)
 
 if(INTERVAL_ENABLE_MPFR_TESTS)
     find_package(PkgConfig QUIET)
@@ -106,4 +113,12 @@ if(INTERVAL_ENABLE_MPFR_TESTS)
     target_link_libraries(FloatBoundsOracleTests PRIVATE interval ${MPFR_LIBRARY} ${GMP_LIBRARY})
     add_test(NAME float_bounds_mpfr COMMAND FloatBoundsOracleTests)
     set_tests_properties(float_bounds_mpfr PROPERTIES LABELS "float-inclusion;mpfr")
+
+    add_executable(InvalidityOracleTests tests/invalidity_tests.cpp)
+    set_target_properties(InvalidityOracleTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+    target_compile_definitions(InvalidityOracleTests PRIVATE INTERVAL_INVALIDITY_MPFR_ORACLE=1)
+    target_include_directories(InvalidityOracleTests PRIVATE ${MPFR_INCLUDE_DIR} ${GMP_INCLUDE_DIR})
+    target_link_libraries(InvalidityOracleTests PRIVATE interval ${MPFR_LIBRARY} ${GMP_LIBRARY})
+    add_test(NAME invalidity_mpfr COMMAND InvalidityOracleTests)
+    set_tests_properties(invalidity_mpfr PROPERTIES LABELS "mpfr")
 endif()

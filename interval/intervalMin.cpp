@@ -27,10 +27,10 @@ namespace itv {
 // interval Min(const interval& x);
 // void testMin();
 
-// Public API: enclose minimum after target operand conversions.
+// Numeric kernel: enclose minimum after target operand conversions.
 // Empty stays empty; widened integers recover their signed hull.
 // The result is floating exactly when either operand is floating.
-interval interval_algebra::Min(const interval& xInput, const interval& yInput) const
+interval interval_algebra::numericMin(const interval& xInput, const interval& yInput) const
 {
     // Compare target values after integer widening and any implicit float cast.
     const auto [x, y] = detail::comparisonOperands(xInput, yInput);

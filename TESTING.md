@@ -2,7 +2,8 @@ These notes on testing the intervals results are destined to future library cont
 
 # Test suites
 
-The project has five dependency-free executables and three optional oracle targets:
+The project has six dependency-free regression executables and four optional
+oracle targets, plus the experimental `TestInterval` program:
 
 - `IntervalTests` contains fast, deterministic regression tests. It checks interval bounds and
   LSB values strictly and is the suite executed by CTest and CI.
@@ -36,6 +37,29 @@ The project has five dependency-free executables and three optional oracle targe
   before the wide reference or any interval-library call. See the
   [MPFR subnormal-emulation documentation](https://www.mpfr.org/mpfr-current/mpfr.html#Exception-Related-Functions).
 
+- `FaustIntegrationTests` checks float/double nature and int32 wrapping through
+  the ordinary/affine bridge, including the rain noise recurrence, as C++17.
+- `InvalidityTests`, also C++17, checks the separate `mayBeInvalid` attribute:
+  numeric bottom versus invalid-only, partial domains, every numeric transfer's
+  propagation, flag-aware ordering/joins/widening, UI/selection/effect operands,
+  foreign/resource uncertainty, joint infinite arguments, undefined casts,
+  modulo and shift counts. It exercises both float and double. Runtime NaN
+  witnesses and fixed-seed bit patterns independently check classification;
+  the test never executes an invalid C++ float-to-int conversion.
+- `InvalidityOracleTests`, enabled by the same MPFR option, additionally checks
+  unary/binary NaN domains and int32 truncation using 256-bit MPFR. Production
+  code and `InvalidityTests` do not link MPFR/GMP.
+
+The validity regression can be run independently:
+
+```sh
+ctest --test-dir build -R invalidity --output-on-failure
+```
+
+The real-Faust rejection corpus remains separate: it requires an external compiler
+and currently records missing diagnostic rejections, rather than treating inserted
+runtime guards as a pass. See [tests/faust/REJECTIONS.md](tests/faust/REJECTIONS.md).
+
 See [FLOAT_COUNTEREXAMPLES.md](FLOAT_COUNTEREXAMPLES.md) for the original failures,
 corrected bounds and reproduction commands. Both direct execution and CTest
 require inclusion and return zero on success:
@@ -67,9 +91,10 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Use `checkExact` when both the bounds and the LSB are part of the expected result. The historical
-`check` overload for intervals compares bounds and reports an LSB difference as a warning; it is
-kept for exploratory numerical analyses.
+Use `checkExact` when bounds, validity and LSB are part of the expected result. The historical
+`check` overload for intervals compares bounds and validity, and reports an LSB difference as a warning; it is
+kept for exploratory numerical analyses. Interval equality and inclusion observe
+validity flags even when the numeric endpoints are unchanged.
 
 Sampled analyses use fixed seeds so a failure can be reproduced. They remain complements to,
 not replacements for, deterministic boundary and regression tests.

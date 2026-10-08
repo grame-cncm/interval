@@ -26,10 +26,10 @@ namespace itv {
 //------------------------------------------------------------------------------------------
 // Interval Abs
 
-// Public API: enclose wrapping int32 absolute value or floating absolute value.
+// Numeric kernel: enclose wrapping int32 absolute value or floating absolute value.
 // Empty stays empty. Normalize widened integer corridors before endpoint work;
 // the result retains the input nature, including integral-valued floating zero.
-interval interval_algebra::Abs(const interval& input) const
+interval interval_algebra::numericAbs(const interval& input) const
 {
     const interval x = detail::int32Hull(input);
     if (x.isEmpty()) {

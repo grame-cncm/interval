@@ -137,7 +137,7 @@ static interval ipow(const interval& x, int k)
 /**
  * @brief Interval elevated to an interval power
  */
-interval interval_algebra::fPow(const interval& x, const interval& y) const
+interval interval_algebra::numericfPow(const interval& x, const interval& y) const
 {
     if (x.isEmpty() || y.isEmpty()) {
         return empty();
@@ -148,7 +148,7 @@ interval interval_algebra::fPow(const interval& x, const interval& y) const
     return Exp(Mul(y, Log(x)));
 }
 
-interval interval_algebra::iPow(const interval& x, const interval& y) const
+interval interval_algebra::numericiPow(const interval& x, const interval& y) const
 {
     if (x.isEmpty() || y.isEmpty()) {
         return empty();
@@ -182,10 +182,10 @@ interval interval_algebra::iPow(const interval& x, const interval& y) const
     return z;
 }
 
-// Public API: numeric power image. Float/double floating powers round outward; negative
+// Numeric kernel: numeric power image. Float/double floating powers round outward; negative
 // bases use integer exponents by parity. The existing nonnegative integer-power
-// path retains wrapping and LSB estimates. NaN is not tracked separately.
-interval interval_algebra::PowBounds(const interval& xIn, const interval& yIn) const
+// path retains wrapping and LSB estimates. Validity is attached by the public transfer.
+interval interval_algebra::numericPowBounds(const interval& xIn, const interval& yIn) const
 {
     const auto [x, y] = detail::int32Operands(xIn, yIn);
     if (x.isEmpty() || y.isEmpty()) {

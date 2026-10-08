@@ -26,10 +26,10 @@ namespace itv {
 //------------------------------------------------------------------------------------------
 // negation, invert sign of an interval
 
-// Public API: enclose wrapping int32 negation or floating sign reversal.
+// Numeric kernel: enclose wrapping int32 negation or floating sign reversal.
 // Empty stays empty. Normalize widened integer corridors before endpoint work;
 // the result retains the input nature, including integral-valued floating zero.
-interval interval_algebra::Neg(const interval& input) const
+interval interval_algebra::numericNeg(const interval& input) const
 {
     const interval x = detail::int32Hull(input);
     if (x.isEmpty()) {

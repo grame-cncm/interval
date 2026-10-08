@@ -27,10 +27,10 @@ namespace itv {
 // interval Sinh(const interval& x);
 // void testSinh();
 
-// Public API: numeric sinh image on its valid domain. In float/double,
+// Numeric kernel: numeric sinh image on its valid domain. In float/double,
 // the native kernel encloses endpoints and extrema; quad/fixed retain
-// their historical rule. LSB is an estimate; NaN is not tracked separately.
-interval interval_algebra::SinhBounds(const interval& x) const
+// their historical rule. LSB is an estimate; Validity is attached by the public transfer.
+interval interval_algebra::numericSinhBounds(const interval& x) const
 {
     if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Sinh, x);
     if (x.isEmpty()) {

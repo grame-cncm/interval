@@ -20,7 +20,7 @@ namespace itv {
 //------------------------------------------------------------------------------------------
 // Interval IntNum
 
-interval interval_algebra::NumEntry(const interval& name, const interval& init, const interval& lo,
+interval interval_algebra::numericNumEntry(const interval& name, const interval& init, const interval& lo,
                                     const interval& hi, const interval& step) const
 {
     if (init.isEmpty() || lo.isEmpty() || hi.isEmpty() || step.isEmpty()) {
@@ -31,7 +31,7 @@ interval interval_algebra::NumEntry(const interval& name, const interval& init, 
     // k an integer the precision needed to represent such elements is the minimum between
     int lsb =
         std::min(step.lsb(), lo.lsb());  // the precision of the lower bound and that of the step
-    if (step.lo() > 0) {                 // if we don't have negative or zero steps
+    if (step.lo() > 0 && std::isfinite(step.lo())) {                 // if we don't have negative or zero steps
         // and that associated to the smallest value the step can take
         lsb = std::min(lsb, (int)std::log2(step.lo()));
     }

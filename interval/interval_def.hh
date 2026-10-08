@@ -34,7 +34,8 @@
 // ***************************************************************************
 //
 //     An Interval is a (possibly empty) set of numbers approximated by two
-//     boundaries. Empty intervals have NAN as boundaries.
+//     boundaries. NaN boundaries encode an empty numeric part; a separate flag
+//     records possible invalid execution, including a NaN or undefined conversion.
 //
 //****************************************************************************
 namespace itv {
@@ -137,6 +138,7 @@ class interval {
     double fLo{std::numeric_limits<double>::lowest()};  ///< minimal value
     double fHi{std::numeric_limits<double>::max()};     ///< maximal value
     int    fLSB{-24};                                   ///< lsb in bits
+    bool   fMayBeInvalid{false};                         ///< independent of numeric bounds
 
    public:
     //-------------------------------------------------------------------------
@@ -145,8 +147,11 @@ class interval {
 
     interval() = default;
 
-    interval(double n, double m, int lsb = -24) noexcept
+    // Public API: construct a numeric enclosure and optional invalidity. NaN
+    // endpoints describe an invalid-only value; use empty() for numeric bottom.
+    interval(double n, double m, int lsb = -24, bool mayBeInvalid = false) noexcept
     {
+        fMayBeInvalid = mayBeInvalid || std::isnan(n) || std::isnan(m);
         if (n == 0.0 && m == 0.0) {
             fLo  = 0.0;
             fHi  = 0.0;
@@ -182,10 +187,11 @@ class interval {
     explicit interval(double x) noexcept
     {
         // Exceptional points have no finite grid exponent. Avoid precision
-        // inference on NaN/inf; NaN retains the historical empty convention.
+        // inference on NaN/inf; a NaN point has no numeric value and is invalid.
         if (!std::isfinite(x)) {
             fLo = x;
             fHi = x;
+            fMayBeInvalid = std::isnan(x);
             return;
         }
         if (x == 0) {
@@ -218,23 +224,48 @@ class interval {
     //-------------------------------------------------------------------------
 
     bool isEmpty() const { return std::isnan(fLo) || std::isnan(fHi); }
-    bool isValid() const { return !isEmpty(); }  // for compatibility reasons
+    // Public API: isEmpty() tests only numeric bottom; isValid() additionally
+    // requires proven validity. Invalid-only and partially invalid values differ.
+    bool isValid() const { return !isEmpty() && !fMayBeInvalid; }
+    // Public API: true means an invalid execution is possible, not certain.
+    bool mayBeInvalid() const { return fMayBeInvalid; }
+    // Public API: monotonically add an alert without changing bounds or nature.
+    // Passing false cannot erase an alert produced earlier in the computation.
+    interval withInvalid(bool possible = true) const noexcept
+    {
+        interval result = *this;
+        result.fMayBeInvalid = fMayBeInvalid || possible;
+        return result;
+    }
+    // Public API: numeric bottom with no alert. NaN endpoints are storage
+    // sentinels here, not injected NaN values; retain the requested nature.
+    static interval numericEmpty(int lsb = 0) noexcept
+    {
+        interval result;
+        result.fLo = result.fHi = NAN;
+        result.fLSB = lsb;
+        return result;
+    }
     bool isUnbounded() const { return std::isinf(fLo) || std::isinf(fHi); }
     bool isBounded() const { return !isUnbounded(); }
     bool has(double x) const { return (fLo <= x) && (fHi >= x); }
-    bool is(double x) const { return (fLo == x) && (fHi == x); }
+    // An alerted numeric point also represents possible invalid execution, so
+    // singleton predicates must not let a consumer fold away that possibility.
+    bool is(double x) const { return !fMayBeInvalid && (fLo == x) && (fHi == x); }
     bool hasZero() const { return has(0.0); }
     bool isZero() const { return is(0.0); }
-    bool isconst() const { return (fLo == fHi) && !std::isnan(fLo); }
+    bool isconst() const { return (fLo == fHi) && !std::isnan(fLo) && !fMayBeInvalid; }
 
     bool ispowerof2() const
     {
+        if (!isconst() || fHi < 1 || fHi > INT_MAX) return false;
         auto n = int(fHi);
         return isconst() && ((n & (-n)) == n);
     }
 
     bool isbitmask() const
     {
+        if (!isconst() || fHi < 0 || fHi >= INT_MAX) return false;
         int n = int(fHi) + 1;
         return isconst() && ((n & (-n)) == n);
     }
@@ -247,6 +278,9 @@ class interval {
     // position of the most significant bit of the value, without taking the sign bit into account
     int msb() const
     {
+        // Numeric bottom has no grid magnitude. Avoid a NaN-to-int metadata
+        // conversion; callers must inspect validity before using an empty format.
+        if (isEmpty()) return 0;
         if ((fLo == 0) && (fHi == 0)) {
             return 0;
         }
@@ -272,11 +306,11 @@ class interval {
     std::string to_string() const
     {
         if (isEmpty()) {
-            return "[]";
+            return fMayBeInvalid ? "[] + invalid" : "[]";
         } else {
             char buffer[64];
             snprintf(buffer, 63, "[%g, %g]", fLo, fHi);
-            return std::string(buffer);
+            return std::string(buffer) + (fMayBeInvalid ? " + invalid" : "");
         }
     }
 };
@@ -288,9 +322,10 @@ class interval {
 inline std::ostream& operator<<(std::ostream& dst, const interval& i)
 {
     if (i.isEmpty()) {
-        return dst << "empty()";
+        return dst << (i.mayBeInvalid() ? "empty() + invalid" : "empty()");
     } else {
-        return dst << "interval(" << i.lo() << ',' << i.hi() << ',' << i.lsb() << ")";
+        return dst << "interval(" << i.lo() << ',' << i.hi() << ',' << i.lsb() << ")"
+                   << (i.mayBeInvalid() ? " + invalid" : "");
     }
 }
 
@@ -298,9 +333,10 @@ inline std::ostream& operator<<(std::ostream& dst, const interval& i)
 // set operations
 //-------------------------------------------------------------------------
 
-inline interval empty() noexcept
+// Public API: numeric bottom, distinct from an invalid-only execution.
+inline interval empty(int lsb = 0) noexcept
 {
-    return {NAN, NAN, 0};
+    return interval::numericEmpty(lsb);
 }
 
 /**
@@ -316,35 +352,38 @@ inline interval fullFinite(int lsb = -24) noexcept
 
 inline interval intersection(const interval& i, const interval& j)
 {
+    // Numeric refinement must not silently clear an existing validity alert.
+    const bool invalid = i.mayBeInvalid() || j.mayBeInvalid();
     if (i.isEmpty()) {
-        return i;
+        return i.withInvalid(invalid);
     } else if (j.isEmpty()) {
-        return j;
+        return j.withInvalid(invalid);
     } else {
         double l = std::max(i.lo(), j.lo());
         double h = std::min(i.hi(), j.hi());
         int    p = std::min(i.lsb(),
                             j.lsb());  // precision of the intersection should be the finest of the two
         if (l > h) {
-            return empty();
+            return empty().withInvalid(invalid);
         } else {
-            return {l, h, p};
+            return {l, h, p, invalid};
         }
     }
 }
 
 inline interval reunion(const interval& i, const interval& j)
 {
+    const bool invalid = i.mayBeInvalid() || j.mayBeInvalid();
     if (i.isEmpty()) {
-        return j;
+        return j.withInvalid(invalid);
     } else if (j.isEmpty()) {
-        return i;
+        return i.withInvalid(invalid);
     } else {
         double l = std::min(i.lo(), j.lo());
         double h = std::max(i.hi(), j.hi());
         int    p =
             std::min(i.lsb(), j.lsb());  // precision of the reunion should be the finest of the two
-        return {l, h, p};
+        return {l, h, p, invalid};
     }
 }
 
@@ -375,13 +414,15 @@ inline interval singleton(double x)
 // basic predicates
 inline bool operator==(const interval& i, const interval& j)
 {
-    return (i.isEmpty() && j.isEmpty()) || ((i.lo() == j.lo()) && (i.hi() == j.hi()));
+    return i.mayBeInvalid() == j.mayBeInvalid() &&
+           ((i.isEmpty() && j.isEmpty()) || ((i.lo() == j.lo()) && (i.hi() == j.hi())));
 }
 
-// Public API: bounds-only inclusion, independent of LSB. Empty is the bottom
-// element, including when both operands are empty; NaN comparisons cannot encode it.
+// Public API: numeric and validity inclusion, independent of LSB. An alert can
+// only be included in another alert; numeric bottom without an alert is bottom.
 inline bool operator<=(const interval& i, const interval& j)
 {
+    if (i.mayBeInvalid() && !j.mayBeInvalid()) return false;
     if (i.isEmpty()) {
         return true;
     }
@@ -444,7 +485,7 @@ inline interval libmBounds(const interval& r, double fmin, double fmax)
     }
     if (r.lo() >= fmin) lo = std::max(lo, fmin);
     if (r.hi() <= fmax) hi = std::min(hi, fmax);
-    return interval(lo, hi, r.lsb());
+    return interval(lo, hi, r.lsb(), r.mayBeInvalid());
 }
 
 }  // namespace itv

@@ -12,8 +12,8 @@ Herrou, Stéphane Letz.
 ## The two roles of the interval computation
 
 - **Correctness** — the program runs right: delay lines sized from provable bounds,
-  table indices certified within `[0, size)`, no division by zero, no NaN, no
-  infinity, compile-time error reporting. For reliable static validation, an
+  table indices certified within `[0, size)`, operation-domain and conversion
+  validity, compile-time error reporting. For reliable static validation, an
   uncertified table index must cause a diagnostic rejection; explicit index
   clamping belongs in the author's program. These are the intended guarantees,
   subject to the limitations described below.
@@ -102,15 +102,18 @@ uncertified index must be rejected with a diagnostic; silently clamping it does
 not satisfy that validation policy.
 
 **This section specifies the required contract, not a claim that the current
-implementation fully satisfies it.** The separate `mayBeInvalid` field is not
-implemented yet. NaN tracking, invalid conversions, target-libm guarantees and
-recurrence verification remain obligations described below. The integer nature
-convention remains `lsb >= 0`; the validity flag is independent of `lsb`.
+implementation fully satisfies it.** Both interval layers carry `mayBeInvalid`
+and include it in their ordering. Domain checks cover NaN-producing numeric
+operations and undefined int32 conversions, remainders and shift counts under
+the declared contract. Target-libm guarantees and recurrence verification remain
+obligations described below. The integer nature convention remains `lsb >= 0`;
+the validity flag is independent of `lsb`.
 
 ## Two layers
 
-1. **Ordinary intervals** (`interval_def.hh`, `interval_algebra.hh`): a triplet
-   `<lo, hi, lsb>` — bounds plus least-significant-bit precision — with one
+1. **Ordinary intervals** (`interval_def.hh`, `interval_algebra.hh`):
+   `<lo, hi, lsb, mayBeInvalid>` — numeric bounds, least-significant-bit precision
+   and possible invalidity — with one
    implementation file per Faust primitive (`intervalXXX.cpp`). `interval_algebra`
    implements the full `FaustAlgebra<interval>` interface (the primitive set of the
    Faust signal language, vendored in `FaustAlgebra/`).
@@ -209,8 +212,8 @@ endpoints must not create a false constant. Exact transcendental identities
 such as `sin(0)`, `exp(0)` and `log(1)` also remain points in `*Bounds`.
 
 This is the first step towards a reliable computational analysis. It does not
-certify arbitrary target libms or reassociation, add separate NaN/signed-zero
-tracking, prove recurrence invariants, or certify the LSB precision estimates.
+certify arbitrary target libms or reassociation, track signed zeros separately,
+prove recurrence invariants, or certify the LSB precision estimates.
 Those obligations need separate verification before bounds justify safety
 decisions. The quad/fixed paths retain their previous rules and need
 their own audit. The new transcendental reference is intended for inclusion;
@@ -237,9 +240,10 @@ ranges used by the clamp. This is the precise contract of the historical
 `nextafter` margin; a published absolute error in ULPs must be translated into
 that contract, especially at binade boundaries. Arbitrary libms remain uncertified.
 Disabling the margin requires a correctly-rounded target. This distinction
-applies equally to float and double. NaN remains the empty convention, rather
-than a separate possible-value flag. Single-mode reciprocal and negative powers
-of merged signed zero use a wider hull to include both infinite signs.
+applies equally to float and double. `mayBeInvalid` separately records possible
+NaN or undefined execution; NaN endpoints encode only numeric emptiness.
+Reciprocal and negative powers of merged signed zero use wider float/double
+hulls to include both infinite signs.
 
 Float affine arithmetic collapses floating add/subtract/multiply/divide and
 casts to a constant interval hull over the horizon. Rounded staircases cannot
@@ -299,6 +303,67 @@ python3 tests/faust/run-rejections.py --faust /path/to/faust/build/bin/faust
 This test currently exposes a missing compiler rejection; it does not pass by
 silently adding a runtime clamp and is separate from the standalone library tests.
 
+## Validity API and compiler integration
+
+`interval::mayBeInvalid()` and `AffItv::mayBeInvalid` are the same attribute.
+`withInvalid(true)` adds an alert; `withInvalid(false)` never clears one.
+The ordinary four-argument constructor explicitly accepts an incoming flag.
+For example:
+
+```cpp
+itv::interval_algebra algebra;
+const auto y = algebra.Sqrt(itv::interval(-1, 4));
+// y contains [0, 2] and y.mayBeInvalid() is true.
+const auto z = algebra.IntCast(y);
+// z contains [0, 2], has an integer LSB, and retains the alert.
+```
+
+`empty()` / `aempty()` construct numeric bottom without an alert. An injected
+NaN constructs an invalid-only value. `isEmpty()` tests the numeric part only;
+ordinary `isValid()` additionally requires a false flag. An alerted point is not
+a foldable constant. Equality, inclusion, joins and affine widening include the
+flag, so a flag-only change cannot masquerade as fixpoint convergence. Numeric
+intersection preserves existing alerts, rather than proving away earlier invalid
+execution. `libmBounds`, casts and both affine bridges retain the attribute.
+
+`IntCast` considers truncation toward zero: in double mode, `2147483647.75`
+converts validly to `INT_MAX`; `2147483648` does not. An invalid-only input has
+no valid numeric integer result; a partly valid input keeps its truncated valid
+image and raises the flag. Returning a hardware-dependent sentinel or full int32
+does not make an undefined C++ cast valid.
+
+The wrapping integer-power path requires nonnegative exponents; a possible
+negative exponent is uncertified rather than silently treated as zero. Floating
+negative powers use the floating path and its own domain.
+
+The default numeric contract allows IEEE infinities when they are not NaN:
+`log(0)` and `1/0` need not raise this flag, whereas `0/0`, `0*infinity`, and
+`infinity-infinity` do. An application requiring finite results must also check
+finiteness. Integer wrapping is valid under the declared wrapping contract.
+
+Unknown foreign floating storage and uncontracted foreign functions remain
+uncertified. Table reads and indexed soundfile accesses cannot establish their
+full domain in this value-only interface, which lacks resource extents; they
+conservatively raise the flag. The compiler must provide domain-aware rules using
+the actual table/channel/part dimensions. Writes check their supplied table size.
+Inputs, UI zones and soundfile samples still rely on their declared host domains;
+this flag does not enforce those domains at runtime. Widget declarations assume
+finite ordered bounds, an initial value within them and a nonnegative finite step.
+
+**Faust must preserve the flag in type construction, copying, serialization,
+joins and recurrence verification, and consult it before validating indices or
+folding constants.** Copying only `lo`, `hi` and `lsb` loses information. Reconstruct
+numeric bottom with `empty(lsb).withInvalid(storedFlag)`, not a NaN-valued literal.
+Invalid constant conversions must also be checked before folding erases their
+source. Adding the field to this library does not update those compiler consumers
+or its diagnostic rejection policy automatically.
+
+`InvalidityTests` checks these rules in float and double, including ordinary and
+affine transfers, partial domains, invalid-only values, flag-only convergence,
+joint infinite arguments, cast thresholds and independent NaN witnesses. Optional
+`InvalidityOracleTests` adds MPFR domain and truncation checks. See
+[VALIDITY.md](VALIDITY.md) for the French implementation and migration notes.
+
 ## Building and optional MPFR oracle
 
 The library and its public/affine headers support C++17, with **no MPFR/GMP
@@ -353,7 +418,9 @@ curves and interior zero crossings cannot be bounded by endpoint interpolation.
 - `interval()` is the historical default interval. It contains every finite value
   representable by a `double` and has an LSB of `-24`.
 - `fullFinite()` constructs the same interval explicitly, optionally with a different LSB.
-- `empty()` constructs the empty interval, represented internally with `NaN` bounds.
+- `empty()` constructs numeric bottom with a false validity flag, using `NaN`
+  endpoints as storage sentinels. `empty().withInvalid()` is invalid-only.
+- `interval(NAN)` injects an invalid-only value; it is distinct from `empty()`.
 - `interval(-HUGE_VAL, HUGE_VAL)` also contains infinities and is therefore distinct from
   `fullFinite()`.
 
@@ -364,6 +431,8 @@ All the code lives in the namespace `itv`:
 - `interval_def.hh` — the interval data structure and its basic accessors
 - `interval_algebra.hh/cpp` — all operations on intervals, as defined by the Faust
   primitives; one `intervalXXX.cpp` per operation
+- `intervalValidity.cpp`, `validity.hh` — public validity-aware transfers and
+  internal operation-domain predicates, separate from the numeric kernels
 - `bitwiseOperations.hh/cpp` — helpers for the bitwise operations
 - `affint.hh` — the affine-in-time interval (`AffItv`) and its numeric core
 - `affine_ops.hh` — `AffineOps<Base>`, the FaustAlgebra operations over `AffItv`;

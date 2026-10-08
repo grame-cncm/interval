@@ -32,10 +32,10 @@ static double myGt(double x, double y)
     return (x > y);
 }
 
-// Public API: enclose comparison after target operand conversions.
+// Numeric kernel: enclose comparison after target operand conversions.
 // Normalize widened integers before deciding a predicate.
 // Empty stays empty; a nonempty result is integer zero, one or both.
-interval interval_algebra::Gt(const interval& xInput, const interval& yInput) const
+interval interval_algebra::numericGt(const interval& xInput, const interval& yInput) const
 {
     // Compare target values after integer widening and any implicit float cast.
     const auto [x, y] = detail::comparisonOperands(xInput, yInput);

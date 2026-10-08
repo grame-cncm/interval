@@ -19,11 +19,11 @@ namespace itv {
 //------------------------------------------------------------------------------------------
 // Interval IntNum
 
-// Public API: inject a known literal as a point, rounded once to binary32 in float
+// Numeric kernel: inject a known literal as a point, rounded once to binary32 in float
 // mode. Float/double retain floating nature even for integral-looking literals;
 // quad/fixed keep legacy injection. Explicit literals need no analyzer-error widening.
-// NaN keeps the library's historical empty representation.
-interval interval_algebra::FloatNum(double x) const
+// NaN literals retain an invalid-only numeric representation.
+interval interval_algebra::numericFloatNum(double x) const
 {
     const interval value = singleton(programBound(x));
     if (programPrecision() != 1 && programPrecision() != 2) return value;

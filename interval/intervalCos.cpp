@@ -33,10 +33,10 @@ static double cosPi(double x)
     return std::cos(x * M_PI);
 }
 
-// Public API: numeric cos image on its valid domain. In float/double,
+// Numeric kernel: numeric cos image on its valid domain. In float/double,
 // the native kernel encloses endpoints and extrema; quad/fixed retain
-// their historical rule. LSB is an estimate; NaN is not tracked separately.
-interval interval_algebra::CosBounds(const interval& x) const
+// their historical rule. LSB is an estimate; Validity is attached by the public transfer.
+interval interval_algebra::numericCosBounds(const interval& x) const
 {
     if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Cos, x);
     if (x.isEmpty()) {

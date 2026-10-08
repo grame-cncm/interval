@@ -27,12 +27,12 @@ namespace itv {
 // interval FloatCast(const interval& x);
 // void testFloatCast();
 
-// Public API: enclose conversion to the program's floating type. In float mode,
+// Numeric kernel: enclose conversion to the program's floating type. In float mode,
 // convert the source endpoints once; IEEE narrowing is monotone. This is a known
 // conversion, not a bound calculation with an unknown analyzer rounding residual.
 // Normalize widened integer sources before conversion, retaining a negative
 // floating LSB in every precision. NaN keeps the historical empty convention.
-interval interval_algebra::FloatCast(const interval& input) const
+interval interval_algebra::numericFloatCast(const interval& input) const
 {
     const interval x = detail::int32Hull(input);
     // LSB with -1 value to force the float typing

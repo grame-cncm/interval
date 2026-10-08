@@ -26,10 +26,10 @@ namespace itv {
 // interval Not(const interval& x);
 // void testNot();
 
-// Public API: enclose int32 bitwise complement after integer conversion.
+// Numeric kernel: enclose int32 bitwise complement after integer conversion.
 // ~x = -1-x reverses signed order, so endpoints suffice even for full int32;
 // enumerating that range would not terminate. The low bit is always significant.
-interval interval_algebra::Not(const interval& input) const
+interval interval_algebra::numericNot(const interval& input) const
 {
     const interval x = IntCast(input);
     if (x.isEmpty()) return empty();

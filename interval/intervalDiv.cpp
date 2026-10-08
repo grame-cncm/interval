@@ -25,11 +25,11 @@ namespace itv {
 //------------------------------------------------------------------------------------------
 // Interval division
 
-// Public API: enclose floating division with directly divided endpoints. Float/double
+// Numeric kernel: enclose floating division with directly divided endpoints. Float/double
 // bounds round outward; quad/fixed retain their previous evaluation.
 // Empty operands yield empty; zero or an indeterminate infinite corner gives
 // [-inf, +inf]. The LSB estimate remains separate from numeric bound inclusion.
-interval interval_algebra::Div(const interval& x, const interval& y) const
+interval interval_algebra::numericDiv(const interval& x, const interval& y) const
 {
     if (x.isEmpty() || y.isEmpty()) {
         return empty();

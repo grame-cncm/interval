@@ -36,10 +36,10 @@ static double myXor(double x, double y)
 }
 
 // BRUTE FORCE
-// Public API: enclose int32 bitwise operations after integer conversion.
+// Numeric kernel: enclose int32 bitwise operations after integer conversion.
 // Normalize widened integers before bit analysis; empty stays empty.
 // Floating inputs are truncated and nonempty results remain integer.
-interval interval_algebra::Xor(const interval& xInput, const interval& yInput) const
+interval interval_algebra::numericXor(const interval& xInput, const interval& yInput) const
 {
     // Bitwise results are int32 even for floating inputs; IntCast also recovers
     // the full signed hull of widened integer operands before bit analysis.

@@ -172,8 +172,8 @@ int main()
         checkExact("remainder identity below half the divisor",
                    ia.Remainder(interval(3, 3, 0), interval(8, 8, 0)),
                    interval(3, 3, -24));
-        checkExact("int cast of a possibly out-of-range float is the full int32 range",
-                   ia.IntCast(interval(1e10, 2e10, -24)), interval(IMIN, IMAX, 0));
+        checkExact("int cast of an invalid-only float has no valid integer result",
+                   ia.IntCast(interval(1e10, 2e10, -24)), empty().withInvalid());
         checkExact("int cast of an in-range float truncates exactly",
                    ia.IntCast(interval(-3.8, 4.9, -24)), interval(-3, 4, 0));
 

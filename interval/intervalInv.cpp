@@ -33,20 +33,19 @@ static double inv(double x)
     return 1 / x;
 }
 
-// Public API: reciprocal bounds and their LSB estimate; empty stays empty.
-// Zero gives both signed infinities in float (signed zero is not tracked); double
-// retains its historical +inf convention. Float/double reciprocal endpoints
+// Numeric kernel: reciprocal bounds and their LSB estimate; empty stays empty.
+// Zero gives both signed infinities in float/double (signed zero is not tracked). Float/double reciprocal endpoints
 // round outward; LSB remains an estimate.
-interval interval_algebra::Inv(const interval& input) const
+interval interval_algebra::numericInv(const interval& input) const
 {
     const interval x = detail::floatingOperand(input);
     if (x.isEmpty()) {
         return empty();
     }
     if (x.isZero()) {
-        // Numeric endpoints do not distinguish +0 from -0. Single precision
-        // must retain both possible signed infinities rather than certify +inf.
-        if (programPrecision() == 1) return {-HUGE_VAL, HUGE_VAL, -24};
+        // Numeric endpoints merge +0 and -0. Both precisions must retain the
+        // two possible infinities so a later operation can detect invalid pairs.
+        if (detail::usesNativeBounds()) return {-HUGE_VAL, HUGE_VAL, -24};
         return {HUGE_VAL, HUGE_VAL, -24};
     }
 

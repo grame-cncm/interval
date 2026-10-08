@@ -28,72 +28,72 @@ namespace itv {
 // This empirical margin does not certify an arbitrary target libm. A caller can
 // inspect the reference through *Bounds independently of libmCompensation.
 //------------------------------------------------------------------------------------------
-interval interval_algebra::Acos(const interval& x) const
+interval interval_algebra::numericAcos(const interval& x) const
 {
     return libmBounds(AcosBounds(x), 0, detail::usesNativeBounds()
         ? detail::directedPi(detail::Direction::Up) : M_PI);
 }
-interval interval_algebra::Acosh(const interval& x) const
+interval interval_algebra::numericAcosh(const interval& x) const
 {
     return libmBounds(AcoshBounds(x), 0, HUGE_VAL);
 }
-interval interval_algebra::Asin(const interval& x) const
+interval interval_algebra::numericAsin(const interval& x) const
 {
     return libmBounds(AsinBounds(x), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Asinh(const interval& x) const
+interval interval_algebra::numericAsinh(const interval& x) const
 {
     return libmBounds(AsinhBounds(x), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Atan(const interval& x) const
+interval interval_algebra::numericAtan(const interval& x) const
 {
     return libmBounds(AtanBounds(x), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Atan2(const interval& x, const interval& y) const
+interval interval_algebra::numericAtan2(const interval& x, const interval& y) const
 {
     return libmBounds(Atan2Bounds(x, y), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Atanh(const interval& x) const
+interval interval_algebra::numericAtanh(const interval& x) const
 {
     return libmBounds(AtanhBounds(x), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Cos(const interval& x) const
+interval interval_algebra::numericCos(const interval& x) const
 {
     return libmBounds(CosBounds(x), -1, 1);
 }
-interval interval_algebra::Cosh(const interval& x) const
+interval interval_algebra::numericCosh(const interval& x) const
 {
     return libmBounds(CoshBounds(x), 1, HUGE_VAL);
 }
-interval interval_algebra::Exp(const interval& x) const
+interval interval_algebra::numericExp(const interval& x) const
 {
     return libmBounds(ExpBounds(x), 0, HUGE_VAL);
 }
-interval interval_algebra::Log(const interval& x) const
+interval interval_algebra::numericLog(const interval& x) const
 {
     return libmBounds(LogBounds(x), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Log10(const interval& x) const
+interval interval_algebra::numericLog10(const interval& x) const
 {
     return libmBounds(Log10Bounds(x), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Pow(const interval& x, const interval& y) const
+interval interval_algebra::numericPow(const interval& x, const interval& y) const
 {
     return libmBounds(PowBounds(x, y), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Sin(const interval& x) const
+interval interval_algebra::numericSin(const interval& x) const
 {
     return libmBounds(SinBounds(x), -1, 1);
 }
-interval interval_algebra::Sinh(const interval& x) const
+interval interval_algebra::numericSinh(const interval& x) const
 {
     return libmBounds(SinhBounds(x), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Tan(const interval& x) const
+interval interval_algebra::numericTan(const interval& x) const
 {
     return libmBounds(TanBounds(x), -HUGE_VAL, HUGE_VAL);
 }
-interval interval_algebra::Tanh(const interval& x) const
+interval interval_algebra::numericTanh(const interval& x) const
 {
     return libmBounds(TanhBounds(x), -1, 1);
 }

@@ -31,10 +31,10 @@ namespace itv {
 // interval Remainder(const interval& x, const interval& y);
 // void testRemainder();
 
-// Public API: numeric IEEE remainder image. Float/double half-divisor bounds round
-// outward, including subnormals; invalid-only domains yield empty. NaN is not
-// tracked separately and LSB remains an estimate.
-interval interval_algebra::Remainder(const interval& xInput, const interval& yInput) const
+// Numeric kernel: numeric IEEE remainder image. Float/double half-divisor bounds round
+// outward, including subnormals; invalid-only domains yield empty. Validity is
+// attached by the public transfer; LSB remains an estimate.
+interval interval_algebra::numericRemainder(const interval& xInput, const interval& yInput) const
 {
     const interval x = detail::floatingOperand(xInput), y = detail::floatingOperand(yInput);
     if (x.isEmpty() || y.isEmpty()) {

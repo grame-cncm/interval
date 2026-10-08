@@ -30,10 +30,10 @@ namespace itv {
 // interval Atan(const interval& x);
 // void testAtan();
 
-// Public API: numeric atan image on its valid domain. In float/double,
+// Numeric kernel: numeric atan image on its valid domain. In float/double,
 // the native kernel encloses endpoints and extrema; quad/fixed retain
-// their historical rule. LSB is an estimate; NaN is not tracked separately.
-interval interval_algebra::AtanBounds(const interval& x) const
+// their historical rule. LSB is an estimate; Validity is attached by the public transfer.
+interval interval_algebra::numericAtanBounds(const interval& x) const
 {
     if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Atan, x);
     if (x.isEmpty()) {

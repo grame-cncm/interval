@@ -27,10 +27,10 @@ namespace itv {
 // interval Max(const interval& x);
 // void testMax();
 
-// Public API: enclose maximum after target operand conversions.
+// Numeric kernel: enclose maximum after target operand conversions.
 // Empty stays empty; widened integers recover their signed hull.
 // The result is floating exactly when either operand is floating.
-interval interval_algebra::Max(const interval& xInput, const interval& yInput) const
+interval interval_algebra::numericMax(const interval& xInput, const interval& yInput) const
 {
     // Compare target values after integer widening and any implicit float cast.
     const auto [x, y] = detail::comparisonOperands(xInput, yInput);

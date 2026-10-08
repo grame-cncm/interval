@@ -33,10 +33,10 @@ static double rsh(double x, double k)
     return x * std::pow(2, -k);
 }
 
-// Public API: enclose arithmetic int32 right shift for counts in [0,31].
+// Numeric kernel: enclose arithmetic int32 right shift for counts in [0,31].
 // Arithmetic shifts round negative quotients downward; real scaling alone can
 // miss the actual integer result. Invalid counts conservatively return full int32.
-interval interval_algebra::ARsh(const interval& input, const interval& counts) const
+interval interval_algebra::numericARsh(const interval& input, const interval& counts) const
 {
     const interval x = IntCast(input), k = IntCast(counts);
     if (x.isEmpty() || k.isEmpty()) return empty();
@@ -48,10 +48,10 @@ interval interval_algebra::ARsh(const interval& input, const interval& counts) c
     return result;
 }
 
-// Public API: enclose logical int32 right shift for counts in [0,31].
+// Numeric kernel: enclose logical int32 right shift for counts in [0,31].
 // A positive shift sees the uint32 bit pattern; shift zero retains the original
 // signed value. Split at zero to handle the unsigned ordering discontinuity.
-interval interval_algebra::LRsh(const interval& input, const interval& counts) const
+interval interval_algebra::numericLRsh(const interval& input, const interval& counts) const
 {
     const interval x = IntCast(input), k = IntCast(counts);
     if (x.isEmpty() || k.isEmpty()) return empty();

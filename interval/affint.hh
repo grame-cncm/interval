@@ -33,16 +33,26 @@
  * which collapse their operands to the hull over [0, T] and delegate to
  * interval_algebra (see affine_ops.hh).
  *
- * Emptiness follows the interval convention: NaN intercepts.
+ * Numeric emptiness follows the interval convention: NaN intercepts. A separate
+ * invalidity flag survives empty results and participates in fixpoint ordering.
  */
 
 namespace itv {
 
 struct AffItv {
-    // The whole value is these five fields: two affine bounds and a precision.
+    // Numeric coefficients and nature are independent of execution validity.
     double a0 = NAN, a1 = 0;  ///< lo(t) = a0 + a1·t
     double b0 = NAN, b1 = 0;  ///< hi(t) = b0 + b1·t
     int    lsb = 0;           ///< precision, as in itv::interval
+    bool   mayBeInvalid = false;  ///< a possible NaN or undefined operation
+
+    // Public API: monotonically add invalidity without changing the corridor.
+    AffItv withInvalid(bool possible = true) const
+    {
+        AffItv result = *this;
+        result.mayBeInvalid = mayBeInvalid || possible;
+        return result;
+    }
 
     bool   isEmpty() const { return std::isnan(a0) || std::isnan(b0); }
     bool   isConst() const { return a1 == 0 && b1 == 0; }
@@ -76,11 +86,12 @@ inline AffItv aempty()
     return {};
 }
 
-/// Lift an ordinary interval: a horizontal corridor.
+/// Public API: lift an ordinary interval to a horizontal corridor, preserving
+/// numeric emptiness, nature and possible invalid execution.
 inline AffItv fromItv(const interval& x)
 {
-    if (x.isEmpty()) return aempty();
-    return {x.lo(), 0, x.hi(), 0, x.lsb()};
+    // Empty numeric bounds can still carry invalid execution and its nature.
+    return {x.lo(), 0, x.hi(), 0, x.lsb(), x.mayBeInvalid()};
 }
 
 /// Collapse to the ordinary interval hull over [0, T] — THE bridge from affine claims
@@ -91,20 +102,23 @@ inline AffItv fromItv(const interval& x)
 /// past absorption — the value freezes, the form keeps over-approximating it.
 inline interval toItv(const AffItv& x, double T)
 {
-    if (x.isEmpty()) return empty();
+    if (x.isEmpty()) return empty(x.lsb).withInvalid(x.mayBeInvalid);
     const double lo = std::min(x.lo(0), x.lo(T));
     const double hi = std::max(x.hi(0), x.hi(T));
     if (x.lsb >= 0 && (hi > 2147483647.0 || lo < -2147483648.0)) {
-        return {-2147483648.0, 2147483647.0, x.lsb};
+        return {-2147483648.0, 2147483647.0, x.lsb, x.mayBeInvalid};
     }
-    return {lo, hi, x.lsb};
+    return {lo, hi, x.lsb, x.mayBeInvalid};
 }
 
 /// Public API: prove x ⊑ y over [0,T], T>=0, by comparing exact affine lines at
 /// both endpoints. In float/double mode an upward enclosure of each difference must
 /// be nonpositive; comparing two separately rounded values could give a false proof.
+/// An invalid execution in x also requires a corresponding alert in y.
 inline bool aleq(const AffItv& x, const AffItv& y, double T)
 {
+    // An unchanged corridor with a new alert is a new abstract state.
+    if (x.mayBeInvalid && !y.mayBeInvalid) return false;
     if (x.isEmpty()) return true;
     if (y.isEmpty()) return false;
     if (detail::usesNativeBounds()) {
@@ -153,12 +167,14 @@ inline void achord(double v0, double vT, double T, double& c0, double& c1, bool 
 /// [0, T] (and min is concave, chord below). Exact when both are constant.
 inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
 {
-    if (x.isEmpty()) return y;
-    if (y.isEmpty()) return x;
+    const bool invalid = x.mayBeInvalid || y.mayBeInvalid;
+    if (x.isEmpty()) return y.withInvalid(invalid);
+    if (y.isEmpty()) return x.withInvalid(invalid);
     AffItv r;
     achord(std::min(x.lo(0), y.lo(0)), std::min(x.lo(T), y.lo(T)), T, r.a0, r.a1);
     achord(std::max(x.hi(0), y.hi(0)), std::max(x.hi(T), y.hi(T)), T, r.b0, r.b1, true);
     r.lsb = std::min(x.lsb, y.lsb);
+    r.mayBeInvalid = invalid;
     return r;
 }
 
@@ -172,12 +188,14 @@ inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
 /// (A domain may run a certification stage before this one — e.g. a probe threshold.)
 inline AffItv awiden(const AffItv& old, const AffItv& fresh, double T)
 {
-    if (old.isEmpty() || fresh.isEmpty()) return fresh;
+    const bool invalid = old.mayBeInvalid || fresh.mayBeInvalid;
+    if (old.isEmpty() || fresh.isEmpty()) return fresh.withInvalid(invalid);
     const bool wlo = fresh.lo(0) < old.lo(0) || fresh.lo(T) < old.lo(T);
     const bool whi = fresh.hi(0) > old.hi(0) || fresh.hi(T) > old.hi(T);
-    if (!wlo && !whi) return fresh;
+    if (!wlo && !whi) return fresh.withInvalid(invalid);
 
     AffItv r = fresh;
+    r.mayBeInvalid = invalid;
     if (whi) {
         if (old.b1 == fresh.b1 && old.b1 == 0 && std::isfinite(fresh.b0 - old.b0)) {
             r.b1 = fresh.b0 - old.b0;  // propose the observed per-round rate

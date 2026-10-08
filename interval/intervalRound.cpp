@@ -27,10 +27,10 @@ namespace itv {
 // interval Round(const interval& x);
 // void testRound();
 
-// Public API: numeric round image; empty stays empty, and integer inputs
+// Numeric kernel: numeric round image; empty stays empty, and integer inputs
 // first convert to the target float. Results keep floating nature in every precision,
 // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
-interval interval_algebra::Round(const interval& input) const
+interval interval_algebra::numericRound(const interval& input) const
 {
     const interval x = detail::floatingOperand(input);
     if (x.isEmpty()) {

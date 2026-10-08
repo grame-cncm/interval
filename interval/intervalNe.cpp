@@ -27,10 +27,10 @@ namespace itv {
 // interval Ne(const interval& x, const interval& y);
 // void testNe();
 
-// Public API: enclose comparison after target operand conversions.
+// Numeric kernel: enclose comparison after target operand conversions.
 // Normalize widened integers before deciding a predicate.
 // Empty stays empty; a nonempty result is integer zero, one or both.
-interval interval_algebra::Ne(const interval& xInput, const interval& yInput) const
+interval interval_algebra::numericNe(const interval& xInput, const interval& yInput) const
 {
     // Compare target values after integer widening and any implicit float cast.
     const auto [x, y] = detail::comparisonOperands(xInput, yInput);

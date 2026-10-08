@@ -36,9 +36,9 @@ static double addint(double x, double y)
     return (int)x + (int)y;
 }
 
-// Public API: enclose addition; float/double floating bounds round outward at each
+// Numeric kernel: enclose addition; float/double floating bounds round outward at each
 // endpoint, while the existing int32 wrapping and other precision paths remain.
-interval interval_algebra::Add(const interval& xIn, const interval& yIn) const
+interval interval_algebra::numericAdd(const interval& xIn, const interval& yIn) const
 {
     const auto [x, y] = detail::int32Operands(xIn, yIn);
     if (x.isEmpty() || y.isEmpty()) {

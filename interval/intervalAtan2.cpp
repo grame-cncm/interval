@@ -30,10 +30,10 @@ namespace itv {
 // be careful with the order of the arguments:
 // atan2 is typically called as atan2(y,x)
 // (where (x,y) are the cartesian coordinates of the point we wish to retrieve the angle of)
-// Public API: numeric atan2(y, x) image. Float/double endpoints round outward and a
+// Numeric kernel: numeric atan2(y, x) image. Float/double endpoints round outward and a
 // possible negative-axis cut covers both signs of pi. Quad/fixed retain
-// their historical rule; LSB is an estimate and NaN is not tracked separately.
-interval interval_algebra::Atan2Bounds(const interval& y, const interval& x) const
+// their historical rule; LSB is an estimate and Validity is attached by the public transfer.
+interval interval_algebra::numericAtan2Bounds(const interval& y, const interval& x) const
 {
     if (detail::usesNativeBounds()) return detail::doubleAtan2Bounds(y, x);
     if (x.isEmpty() || y.isEmpty()) {

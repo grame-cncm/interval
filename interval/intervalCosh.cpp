@@ -27,10 +27,10 @@ namespace itv {
 // interval Cosh(const interval& x);
 // void testCosh();
 
-// Public API: numeric cosh image on its valid domain. In float/double,
+// Numeric kernel: numeric cosh image on its valid domain. In float/double,
 // the native kernel encloses endpoints and extrema; quad/fixed retain
-// their historical rule. LSB is an estimate; NaN is not tracked separately.
-interval interval_algebra::CoshBounds(const interval& x) const
+// their historical rule. LSB is an estimate; Validity is attached by the public transfer.
+interval interval_algebra::numericCoshBounds(const interval& x) const
 {
     if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Cosh, x);
     if (x.isEmpty()) {

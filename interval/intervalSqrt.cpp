@@ -29,10 +29,10 @@ namespace itv {
 
 static const interval SqrtDomain(0, HUGE_VAL, 0);
 
-// Public API: square-root bounds over x intersected with [0, +inf], with an LSB
+// Numeric kernel: square-root bounds over x intersected with [0, +inf], with an LSB
 // estimate. An empty domain yields empty; a zero-only domain yields exact zero.
 // Float/double bounds round outward independently of the host libm and rounding mode.
-interval interval_algebra::Sqrt(const interval& x) const
+interval interval_algebra::numericSqrt(const interval& x) const
 {
     if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Sqrt, x);
     interval i = intersection(SqrtDomain, x);

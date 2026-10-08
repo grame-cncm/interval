@@ -32,10 +32,10 @@ namespace itv {
 
 static const interval domain(-1, 1, 0);  // this interval needs 0 digits of precision
 
-// Public API: numeric asin image on its valid domain. In float/double,
+// Numeric kernel: numeric asin image on its valid domain. In float/double,
 // the native kernel encloses endpoints and extrema; quad/fixed retain
-// their historical rule. LSB is an estimate; NaN is not tracked separately.
-interval interval_algebra::AsinBounds(const interval& x) const
+// their historical rule. LSB is an estimate; Validity is attached by the public transfer.
+interval interval_algebra::numericAsinBounds(const interval& x) const
 {
     if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Asin, x);
     interval i = intersection(domain, x);

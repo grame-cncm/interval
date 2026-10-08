@@ -33,10 +33,10 @@ static double lsh(double x, double k)
     return x * pow(2, k);
 }
 
-// Public API: enclose wrapping int32 left shift for counts in [0,31].
+// Numeric kernel: enclose wrapping int32 left shift for counts in [0,31].
 // Convert operands to integers first. Invalid counts have no portable execution
 // contract and conservatively return full int32; this does not define such shifts.
-interval interval_algebra::Lsh(const interval& input, const interval& counts) const
+interval interval_algebra::numericLsh(const interval& input, const interval& counts) const
 {
     const interval x = IntCast(input), k = IntCast(counts);
     if (x.isEmpty() || k.isEmpty()) return empty();
