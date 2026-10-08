@@ -8,6 +8,7 @@ language: fr
 
 ::: toc+
 - **Indice d’écriture négatif** — isoler une erreur d’indice sans débordement du compteur.
+- **Modulo hors de la boucle et wrapping** — couvrir tout int32 avant de borner le reste signé.
 - **Résultat attendu et reproduction** — exiger un diagnostic, et vérifier un programme explicitement corrigé.
 - **Portée du constat** — distinguer la bibliothèque d’intervalles et son utilisation par Faust.
 :::
@@ -30,9 +31,42 @@ L’indice de lecture est explicitement borné par l’auteur. L’indice d’é
 ne l’est pas : le compilateur doit refuser ce programme. Le bornage automatique
 de l’écriture masquerait l’erreur et modifierait le comportement demandé.
 
+# Modulo hors de la boucle et wrapping
+
+Le second témoin,
+[rwtable-wrapping-write-index.dsp](reject/rwtable-wrapping-write-index.dsp),
+place le modulo après la boucle :
+
+```faust
+i = (+(1) ~ _) : %(200) : -(50);
+process = rwtable(100, 0.0, i, _, max(0, min(i, 99)));
+```
+
+Cette écriture ne borne pas l’état récursif. Sous le contrat d’arithmétique
+entière int32 avec wrapping, le compteur atteint `2147483647`, puis passe à
+`-2147483648`. Sur une exécution suffisamment longue, il parcourt tout int32.
+Son intervalle conservateur doit donc couvrir
+`[-2147483648, 2147483647]`.
+
+Il faut distinguer cet intervalle de celui de l’indice final. Le reste entier
+`% 200` a le signe du dividende : après wrapping, il peut être négatif.
+La propagation donne :
+
+| Étape | Intervalle |
+| :--- | :--- |
+| État du compteur `(+(1) ~ _)` | `[-2147483648, 2147483647]` |
+| Reste entier `% 200` | `[-199, 199]` |
+| Indice après `−50` | `[-249, 149]` |
+
+Ce programme doit aussi être refusé. Il vérifie que l’analyse ne confond pas un
+modulo extérieur avec une borne de l’état récursif, et qu’elle conserve les
+conséquences du wrapping. L’erreur d’accès existe déjà au premier échantillon,
+où l’indice vaut `-49` ; la borne supplémentaire `-249` concerne les valeurs
+possibles après le wrapping.
+
 # Résultat attendu et reproduction
 
-[run-rejections.py](run-rejections.py) vérifie le refus avec les backends `cpp`
+[run-rejections.py](run-rejections.py) vérifie le refus des deux témoins avec les backends `cpp`
 et `ocpp`, en simple et double précision. Il vérifie aussi l’acceptation du
 [témoin valide](accept/rwtable-explicitly-bounded-indices.dsp), où l’auteur borne
 explicitement les deux indices. Une interruption ou un crash du compilateur
@@ -43,8 +77,8 @@ python3 tests/faust/run-rejections.py --faust /chemin/vers/faust
 ```
 
 Avec le binaire d’intégration `669e8de5b-modified`, le témoin valide est accepté
-dans les quatre configurations. Le témoin dangereux est également accepté dans
-les quatre configurations : **le test de refus échoue actuellement** et son
+dans les quatre configurations. Les deux témoins dangereux sont également acceptés dans
+les quatre configurations : **les huit vérifications de refus échouent actuellement** et le
 pilote retourne un statut non nul. Il n’est pas transformé en succès attendu.
 Ce test dépend d’un compilateur Faust externe et reste séparé du CTest de la
 bibliothèque autonome.
