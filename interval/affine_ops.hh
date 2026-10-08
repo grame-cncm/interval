@@ -551,7 +551,11 @@ class AffineOps : public Base {
     /// rate has the wrong sign collapses to its worst constant over the window.
     AffItv delayed(const AffItv& x, double nlo) const
     {
-        if (x.isEmpty()) return fromItv(interval(0, 0));
+        // The initial condition is a zero of the signal's own nature : a float zero
+        // (the default LSB in single precision) would turn an integer delay into a
+        // float, and its later arithmetic would lose the int32 wrap.
+        const interval zero(0, 0, x.lsb);
+        if (x.isEmpty()) return fromItv(zero);
         AffItv r = x;
         if (r.b1 >= 0) {
             // Subtraction reverses the product's bound direction.
@@ -570,8 +574,10 @@ class AffineOps : public Base {
             r.a0 = std::min(x.lo(0), x.lo(fT));
             r.a1 = 0;
         }
-        if (r.isEmpty()) return fromItv(interval(-HUGE_VAL, HUGE_VAL));
-        return ajoin(r, fromItv(interval(0, 0)), fT);
+        if (r.isEmpty())
+            return fromItv(x.lsb >= 0 ? interval(-2147483648.0, 2147483647.0, x.lsb)
+                                      : interval(-HUGE_VAL, HUGE_VAL, x.lsb));
+        return ajoin(r, fromItv(zero), fT);
     }
 };
 

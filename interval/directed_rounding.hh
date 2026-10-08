@@ -57,17 +57,16 @@ inline bool hasInt32Bounds(const interval& x)
     return x.lsb() >= 0 && x.lo() >= -2147483648.0 && x.hi() <= 2147483647.0;
 }
 
-// Under the wrapping semantics, an integer interval with an infinite bound (the
-// widening of an integer recursion) describes any int32. Normalizing it keeps the
-// integer path : the floating path ignores the wrap and certifies values the program
-// never computes (12345 + [0, +inf] is not [12345, +inf] in int32). A FINITE bound
-// beyond int32 with a nonnegative LSB is an integral-looking float, left as it is :
-// the integer rules keep their results within int32, and IntCast saturates.
-// Applied when both operands are integers.
+// Under the wrapping semantics, an integer interval (nonnegative LSB) whose bounds
+// leave int32 describes any int32 : an infinite bound from the widening of an integer
+// recursion, or a finite one from the affine domain evaluated at its horizon (a
+// counter reaches 2^31). Normalizing it keeps the integer path : the floating path
+// ignores the wrap and certifies values the program never computes (12345 + [0, +inf]
+// is not [12345, +inf] in int32). A float literal enters through FloatNum, whose
+// negative LSB keeps it on the floating path. Applied when both operands are integers.
 inline interval int32Hull(const interval& x)
 {
     if (x.isEmpty() || x.lsb() < 0 || hasInt32Bounds(x)) return x;
-    if (std::isfinite(x.lo()) && std::isfinite(x.hi())) return x;
     return {-2147483648.0, 2147483647.0, x.lsb()};
 }
 

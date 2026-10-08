@@ -192,6 +192,10 @@ int main()
     // The affine bridge must use the same float rules. Endpoint chords through
     // rounded values alone cannot prove that intermediate staircase values fit.
     const affine_algebra affine(128);
+    // The initial condition of a delay is a zero of the signal's nature : an integer
+    // stays an integer (and keeps its int32 wrap) once delayed.
+    const AffItv delayedInt = affine.Delay(fromItv(interval(0, 1000, 0)), affine.IntNum(1));
+    check("float: an integer delayed in the affine domain stays an integer", true, delayedInt.lsb >= 0);
     const AffItv moving{4097, 0x1p-7, 4097, 0x1p-7, -24};
     const AffItv product = affine.Mul(moving, affine.FloatNum(4097));
     bool affineIncluded = true;
