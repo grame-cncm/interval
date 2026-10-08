@@ -47,6 +47,9 @@
  *   - the MIXED case (multiplication or division by a rate-0 operand) evaluates the
  *     oracle at both endpoints and chords back, staying affine.
  *
+ * In single precision, floating linear/mixed operations also collapse to the
+ * ordinary oracle: rounded staircases need not fit chords through their endpoints.
+ *
  * Rates are born at widening (awiden), live through the linear regime, die at the
  * nonlinear one.
  */
@@ -133,10 +136,15 @@ class AffineOps : public Base {
 
     //--- the affine-preserving (linear) regime ----------------------------------------
     // Public API: coefficient-wise enclosure of x+y over a nonnegative horizon.
-    // Double coefficients round down on the lower line and up on the upper line.
+    // Double coefficients round outward; float operations use a constant hull
+    // through the ordinary oracle because rounding need not preserve affinity.
     AffItv Add(const AffItv& x, const AffItv& y) const override
     {
         if (x.isEmpty() || y.isEmpty()) return aempty();
+        // Binary32 rounding is a staircase, not an affine function of time.
+        // Collapse float corridors over the horizon and use the outward oracle.
+        if (programPrecision() == 1 && (x.lsb < 0 || y.lsb < 0))
+            return c2(x, y, [this](const interval& a, const interval& b) { return fItv.Add(a, b); });
         if (programPrecision() == 2) {
             const AffItv result{detail::directedBinary(detail::BinaryOp::Add, x.a0, y.a0, detail::Direction::Down),
                     detail::directedBinary(detail::BinaryOp::Add, x.a1, y.a1, detail::Direction::Down),
@@ -152,10 +160,13 @@ class AffineOps : public Base {
                 std::min(x.lsb, y.lsb)};
     }
     // Public API: coefficient-wise enclosure of x-y over a nonnegative horizon.
-    // Double coefficients round down on the lower line and up on the upper line.
+    // Double coefficients round outward; float operations use a constant hull
+    // through the ordinary oracle because rounding need not preserve affinity.
     AffItv Sub(const AffItv& x, const AffItv& y) const override
     {
         if (x.isEmpty() || y.isEmpty()) return aempty();
+        if (programPrecision() == 1 && (x.lsb < 0 || y.lsb < 0))
+            return c2(x, y, [this](const interval& a, const interval& b) { return fItv.Sub(a, b); });
         if (programPrecision() == 2) {
             const AffItv result{detail::directedBinary(detail::BinaryOp::Sub, x.a0, y.b0, detail::Direction::Down),
                     detail::directedBinary(detail::BinaryOp::Sub, x.a1, y.b1, detail::Direction::Down),
@@ -221,14 +232,18 @@ class AffineOps : public Base {
         if (x.isEmpty()) return aempty();
         if (x.isConst()) return fromItv(fItv.IntCast(toItv(x, fT)));
         // truncation keeps affinity with one unit of slack, and marks the chain integer
-        return {programPrecision() == 2 ? detail::directedBinary(
+        return {detail::usesNativeBounds() ? detail::directedBinary(
                     detail::BinaryOp::Sub, x.a0, 1, detail::Direction::Down) : x.a0 - 1,
-                x.a1, programPrecision() == 2 ? detail::directedBinary(
+                x.a1, detail::usesNativeBounds() ? detail::directedBinary(
                     detail::BinaryOp::Add, x.b0, 1, detail::Direction::Up) : x.b0 + 1, x.b1, 0};
     }
     AffItv BitCast(const AffItv& x) const override { return x; }
     AffItv FloatCast(const AffItv& x) const override
     {
+        // Even a constant integer corridor needs the target conversion; moving
+        // corridors cannot retain a real-valued slope through binary32 narrowing.
+        if (programPrecision() == 1)
+            return c1(x, [this](const interval& a) { return fItv.FloatCast(a); });
         if (x.isEmpty() || x.isConst()) return x;
         AffItv r = x;
         r.lsb    = std::min(x.lsb, -24);  // the value is now carried by a float
@@ -511,6 +526,10 @@ class AffineOps : public Base {
         auto op = [&](const interval& a, const interval& b) {
             return isDiv ? fItv.Div(a, b) : fItv.Mul(a, b);
         };
+        // Chording rounded endpoint values need not enclose staircase values
+        // between them. Float operations use a constant sound hull instead.
+        if (programPrecision() == 1 && (isDiv || x.lsb < 0 || y.lsb < 0))
+            return fromItv(op(toItv(x, fT), toItv(y, fT)));
         if ((isDiv && !y.isConst()) || x.isConst() == y.isConst()) {
             return fromItv(op(toItv(x, fT), toItv(y, fT)));
         }
@@ -536,7 +555,7 @@ class AffineOps : public Base {
         AffItv r = x;
         if (r.b1 >= 0) {
             // Subtraction reverses the product's bound direction.
-            r.b0 = programPrecision() == 2 ? detail::directedBinary(detail::BinaryOp::Sub, r.b0,
+            r.b0 = detail::usesNativeBounds() ? detail::directedBinary(detail::BinaryOp::Sub, r.b0,
                 detail::directedBinary(detail::BinaryOp::Mul, r.b1, nlo, detail::Direction::Down),
                 detail::Direction::Up) : r.b0 - r.b1 * nlo;
         } else {
@@ -544,7 +563,7 @@ class AffineOps : public Base {
             r.b1 = 0;
         }
         if (r.a1 <= 0) {
-            r.a0 = programPrecision() == 2 ? detail::directedBinary(detail::BinaryOp::Sub, r.a0,
+            r.a0 = detail::usesNativeBounds() ? detail::directedBinary(detail::BinaryOp::Sub, r.a0,
                 detail::directedBinary(detail::BinaryOp::Mul, r.a1, nlo, detail::Direction::Up),
                 detail::Direction::Down) : r.a0 - r.a1 * nlo;
         } else {

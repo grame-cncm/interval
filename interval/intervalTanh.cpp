@@ -28,12 +28,12 @@ namespace itv {
 // interval Tanh(const interval& x);
 // void testTanh();
 
-// Public API: numeric tanh image on its valid domain. In double precision,
-// the native kernel encloses endpoints and extrema; other precisions retain
+// Public API: numeric tanh image on its valid domain. In float/double,
+// the native kernel encloses endpoints and extrema; quad/fixed retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::TanhBounds(const interval& x) const
 {
-    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Tanh, x);
+    if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Tanh, x);
     if (x.isEmpty()) {
         return empty();
     }

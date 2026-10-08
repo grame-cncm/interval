@@ -24,13 +24,13 @@ namespace itv {
 
 //------------------------------------------------------------------------------------------
 // Public numeric functions: *Bounds computes the reference image (native outward bounds
-// in double mode); libmBounds then adds the historical two-ULP target margin.
+// in float/double mode); libmBounds then adds the historical two-ULP target margin.
 // This empirical margin does not certify an arbitrary target libm. A caller can
 // inspect the reference through *Bounds independently of libmCompensation.
 //------------------------------------------------------------------------------------------
 interval interval_algebra::Acos(const interval& x) const
 {
-    return libmBounds(AcosBounds(x), 0, programPrecision() == 2
+    return libmBounds(AcosBounds(x), 0, detail::usesNativeBounds()
         ? detail::directedPi(detail::Direction::Up) : M_PI);
 }
 interval interval_algebra::Acosh(const interval& x) const

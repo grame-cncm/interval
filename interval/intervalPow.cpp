@@ -182,7 +182,7 @@ interval interval_algebra::iPow(const interval& x, const interval& y) const
     return z;
 }
 
-// Public API: numeric power image. Double floating powers round outward; negative
+// Public API: numeric power image. Float/double floating powers round outward; negative
 // bases use integer exponents by parity. The existing nonnegative integer-power
 // path retains wrapping and LSB estimates. NaN is not tracked separately.
 interval interval_algebra::PowBounds(const interval& x, const interval& y) const
@@ -194,6 +194,10 @@ interval interval_algebra::PowBounds(const interval& x, const interval& y) const
     if (detail::hasInt32Bounds(x) && detail::hasInt32Bounds(y)) {
         return iPow(x, y);
     }
+
+    // Float pow is a single target-libm operation, not rounded exp(y*log(x)).
+    // Use the certified scalar reference and narrow its bounds outward once.
+    if (programPrecision() == 1) return detail::doublePowBounds(x, y);
 
     if (programPrecision() == 2) {
         // Preserve the established grid estimate for bounded integer exponents;

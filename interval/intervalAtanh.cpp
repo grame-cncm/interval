@@ -31,12 +31,12 @@ namespace itv {
 static const interval domain(std::nexttoward(-1, 0), std::nexttoward(1, 0),
                              0);  // interval ]-1,1[, precision 0
 
-// Public API: numeric atanh image on its valid domain. In double precision,
-// the native kernel encloses endpoints and extrema; other precisions retain
+// Public API: numeric atanh image on its valid domain. In float/double,
+// the native kernel encloses endpoints and extrema; quad/fixed retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::AtanhBounds(const interval& x) const
 {
-    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Atanh, x);
+    if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Atanh, x);
     interval i = intersection(domain, x);
     if (i.isEmpty()) {
         return empty();

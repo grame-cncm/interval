@@ -30,12 +30,12 @@ namespace itv {
 // interval Atan(const interval& x);
 // void testAtan();
 
-// Public API: numeric atan image on its valid domain. In double precision,
-// the native kernel encloses endpoints and extrema; other precisions retain
+// Public API: numeric atan image on its valid domain. In float/double,
+// the native kernel encloses endpoints and extrema; quad/fixed retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::AtanBounds(const interval& x) const
 {
-    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Atan, x);
+    if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Atan, x);
     if (x.isEmpty()) {
         return empty();
     }

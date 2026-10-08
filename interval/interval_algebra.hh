@@ -14,9 +14,9 @@ class interval_algebra : public FaustAlgebra<interval> {
     // Injections of external values
     interval IntNum(int x) const override;
     interval Int64Num(int64_t x) const override;
-    // Public API: inject the known binary64 literal as a point. In double mode retain
-    // floating nature even for integral-looking literals; other modes keep legacy
-    // injection. A known literal needs no widening for analyzer rounding error.
+    // Public API: inject a known literal as a point, rounded once to binary32 in float
+    // mode. Float/double retain floating nature even for integral-looking literals;
+    // quad/fixed keep legacy injection. Explicit literals need no analyzer-error widening.
     // NaN keeps the library's historical empty representation.
     interval FloatNum(double x) const override;
     interval Label(const std::string& x) const override;
@@ -69,33 +69,33 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Abs(const interval& x) const override;
     void     testAbs();
     //
-    // Public API: enclose addition; double floating bounds round outward at each
+    // Public API: enclose addition; float/double floating bounds round outward at each
     // endpoint, while the existing int32 wrapping and other precision paths remain.
     interval Add(const interval& x, const interval& y) const override;
     void     testAdd();
     //
-    // Public API: enclose subtraction; double floating bounds round outward at each
+    // Public API: enclose subtraction; float/double floating bounds round outward at each
     // endpoint, while the existing int32 wrapping and other precision paths remain.
     interval Sub(const interval& x, const interval& y) const override;
     void     testSub();
     //
-    // Public API: enclose multiplication; double floating corners round outward.
+    // Public API: enclose multiplication; float/double floating corners round outward.
     // Zero times an unbounded endpoint keeps the historical numeric-hull convention;
     // possible NaN values are not represented separately by this interval type.
     interval Mul(const interval& x, const interval& y) const override;
     void     testMul();
     //
-    // Public API: enclose floating division with directly divided endpoints. Double
-    // bounds round outward; other precisions retain their previous evaluation.
+    // Public API: enclose floating division with directly divided endpoints. Float/double
+    // bounds round outward; quad/fixed retain their previous evaluation.
     // Empty operands yield empty; zero or an indeterminate infinite corner gives
     // [-inf, +inf]. The LSB estimate remains separate from numeric bound inclusion.
     interval Div(const interval& x, const interval& y) const override;
     void     testDiv();
     //
     // Public API: reciprocal bounds and their LSB estimate; empty stays empty.
-    // The exact zero point yields +inf with default floating LSB, preserving the
-    // historical unsigned-zero convention without estimating a precision at zero.
-    // Double reciprocal endpoints round outward; LSB remains an estimate.
+    // Zero gives both signed infinities in float (signed zero is not tracked); double
+    // retains its historical +inf convention. Float/double reciprocal endpoints
+    // round outward; LSB remains an estimate.
     interval Inv(const interval& x) const override;
     void     testInv();
     //
@@ -104,25 +104,25 @@ class interval_algebra : public FaustAlgebra<interval> {
     //
     interval Mod(const interval& x, double m) const;
     // Public API: integer C modulo for integer operands, otherwise numeric fmod.
-    // Double floating bounds avoid rounded quotient tests and unsafe int casts;
+    // Float/double floating bounds avoid rounded quotient tests and unsafe int casts;
     // invalid-only domains yield empty and NaN is not represented separately.
     interval Mod(const interval& x, const interval& y) const override;
-    // Public API: floating modulo; in double precision, even integer-looking inputs
+    // Public API: floating modulo; in float/double, even integer-looking inputs
     // follow fmod rather than C integer modulo. NaN is not tracked separately.
     interval Fmod(const interval& x, const interval& y) const override;
     void     testMod();
     //
 
     interval Acos(const interval& x) const override;
-    // Public API: numeric acos image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric acos image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AcosBounds(const interval& x) const;
     void     testAcos();
     //
     interval Acosh(const interval& x) const override;
-    // Public API: numeric acosh image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric acosh image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AcoshBounds(const interval& x) const;
     void     testAcosh();
@@ -131,51 +131,54 @@ class interval_algebra : public FaustAlgebra<interval> {
     void     testAnd();
     //
     interval Asin(const interval& x) const override;
-    // Public API: numeric asin image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric asin image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AsinBounds(const interval& x) const;
     void     testAsin();
     //
     interval Asinh(const interval& x) const override;
-    // Public API: numeric asinh image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric asinh image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AsinhBounds(const interval& x) const;
     void     testAsinh();
     //
     interval Atan(const interval& x) const override;
-    // Public API: numeric atan image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric atan image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AtanBounds(const interval& x) const;
     void     testAtan();
     //
     interval Atan2(const interval& x, const interval& y) const override;
-    // Public API: numeric atan2(y, x) image. Double endpoints round outward and a
-    // possible negative-axis cut covers both signs of pi. Other precisions retain
+    // Public API: numeric atan2(y, x) image. Float/double endpoints round outward and a
+    // possible negative-axis cut covers both signs of pi. Quad/fixed retain
     // their historical rule; LSB is an estimate and NaN is not tracked separately.
     interval Atan2Bounds(const interval& y, const interval& x) const;
     void     testAtan2();
     //
     interval Atanh(const interval& x) const override;
-    // Public API: numeric atanh image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric atanh image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval AtanhBounds(const interval& x) const;
     void     testAtanh();
     //
+    // Public API: numeric ceil image; empty stays empty, and integer inputs
+    // first convert to the target float. Single-mode results keep floating nature,
+    // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
     interval Ceil(const interval& x) const override;
     void     testCeil();
     interval Cos(const interval& x) const override;
-    // Public API: numeric cos image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric cos image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval CosBounds(const interval& x) const;
     void     testCos();
     interval Cosh(const interval& x) const override;
-    // Public API: numeric cosh image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric cosh image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval CoshBounds(const interval& x) const;
     void     testCosh();
@@ -184,14 +187,21 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Eq(const interval& x, const interval& y) const override;
     void     testEq();
     interval Exp(const interval& x) const override;
-    // Public API: numeric exp image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric exp image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval ExpBounds(const interval& x) const;
     void     testExp();
     interval Exp10(const interval& x) const override;
+    // Public API: enclose conversion to the program's floating type. In float mode,
+    // convert the source endpoints once; IEEE narrowing is monotone. This is a known
+    // conversion, not a bound calculation with an unknown analyzer rounding residual.
+    // Floating LSB is retained; NaN keeps the historical empty convention.
     interval FloatCast(const interval& x) const override;
     void     testFloatCast();
+    // Public API: numeric floor image; empty stays empty, and integer inputs
+    // first convert to the target float. Single-mode results keep floating nature,
+    // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
     interval Floor(const interval& x) const override;
     void     testFloor();
     interval Ge(const interval& x, const interval& y) const override;
@@ -203,14 +213,14 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Le(const interval& x, const interval& y) const override;
     void     testLe();
     interval Log(const interval& x) const override;
-    // Public API: numeric log image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric log image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval LogBounds(const interval& x) const;
     void     testLog();
     interval Log10(const interval& x) const override;
-    // Public API: numeric log10 image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric log10 image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval Log10Bounds(const interval& x) const;
     void     testLog10();
@@ -231,49 +241,55 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Or(const interval& x, const interval& y) const override;
     void     testOr();
     interval Pow(const interval& x, const interval& y) const override;  // for all cases
-    // Public API: numeric power image. Double floating powers round outward; negative
+    // Public API: numeric power image. Float/double floating powers round outward; negative
     // bases use integer exponents by parity. The existing nonnegative integer-power
     // path retains wrapping and LSB estimates. NaN is not tracked separately.
     interval PowBounds(const interval& x, const interval& y) const;
     void     testPow();
-    // Public API: numeric IEEE remainder image. Double half-divisor bounds round
+    // Public API: numeric IEEE remainder image. Float/double half-divisor bounds round
     // outward, including subnormals; invalid-only domains yield empty. NaN is not
     // tracked separately and LSB remains an estimate.
     interval Remainder(const interval& x, const interval& y) const override;
     void     testRemainder();
+    // Public API: numeric rint image; empty stays empty, and integer inputs
+    // first convert to the target float. Single-mode results keep floating nature,
+    // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
     interval Rint(const interval& x) const override;
     void     testRint();
+    // Public API: numeric round image; empty stays empty, and integer inputs
+    // first convert to the target float. Single-mode results keep floating nature,
+    // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
     interval Round(const interval& x) const override;
     void     testRound();
     interval ARsh(const interval& x, const interval& y) const override;
     interval LRsh(const interval& x, const interval& y) const override;
     void     testRsh();
     interval Sin(const interval& x) const override;
-    // Public API: numeric sin image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric sin image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval SinBounds(const interval& x) const;
     void     testSin();
     interval Sinh(const interval& x) const override;
-    // Public API: numeric sinh image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric sinh image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval SinhBounds(const interval& x) const;
     void     testSinh();
     // Public API: square-root bounds over x intersected with [0, +inf], with an LSB
     // estimate. An empty domain yields empty; a zero-only domain yields exact zero.
-    // Double bounds round outward independently of the host libm and rounding mode.
+    // Float/double bounds round outward independently of the host libm and rounding mode.
     interval Sqrt(const interval& x) const override;
     void     testSqrt();
     interval Tan(const interval& x) const override;
-    // Public API: numeric tan image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric tan image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval TanBounds(const interval& x) const;
     void     testTan();
     interval Tanh(const interval& x) const override;
-    // Public API: numeric tanh image on its valid domain. In double precision,
-    // the native kernel encloses endpoints and extrema; other precisions retain
+    // Public API: numeric tanh image on its valid domain. In float/double,
+    // the native kernel encloses endpoints and extrema; quad/fixed retain
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval TanhBounds(const interval& x) const;
     void     testTanh();

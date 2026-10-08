@@ -26,10 +26,14 @@ namespace itv {
 // interval FloatCast(const interval& x);
 // void testFloatCast();
 
+// Public API: enclose conversion to the program's floating type. In float mode,
+// convert the source endpoints once; IEEE narrowing is monotone. This is a known
+// conversion, not a bound calculation with an unknown analyzer rounding residual.
+// Floating LSB is retained; NaN keeps the historical empty convention.
 interval interval_algebra::FloatCast(const interval& x) const
 {
     // LSB with -1 value to force the float typing
-    return {x.lo(), x.hi(), std::min(x.lsb(), -1)};
+    return {programBound(x.lo()), programBound(x.hi()), std::min(x.lsb(), -1)};
 }
 
 void interval_algebra::testFloatCast()

@@ -120,22 +120,54 @@ so `FloatNum(65536) * FloatNum(65536)` does not take the int32 path. Exact
 operations such as `0.5 * 0.25` remain singletons. An inexact operation such as
 `1 + 2^-54` is enclosed by `[1, nextafter(1, +inf)]`; a rounded equality of
 endpoints must not create a false constant. Exact transcendental identities
-such as `sin(0)`, `exp(0)` and `log(1)` also remain points.
+such as `sin(0)`, `exp(0)` and `log(1)` also remain points in `*Bounds`.
 
 This is the first step towards a reliable computational analysis. It does not
 certify arbitrary target libms or reassociation, add separate NaN/signed-zero
 tracking, prove recurrence invariants, or certify the LSB precision estimates.
 Those obligations need separate verification before bounds justify safety
-decisions. The single/quad/fixed paths retain their previous rules and need
+decisions. The quad/fixed paths retain their previous rules and need
 their own audit. The new transcendental reference is intended for inclusion;
 its performance and tightness in the complete Faust compiler need measurement.
 
-Six reproducible missing inclusions in the current float mode are documented in
-[FLOAT_COUNTEREXAMPLES.md](FLOAT_COUNTEREXAMPLES.md), including an analyzed
-nonnegative integer delay whose strict float execution produces `-1`.
-`FloatConservativenessTests` requires inclusion by default and currently fails.
-CTest labels these as `known-float-gaps` and uses an explicit expected-gap mode;
-a passing known-gap test confirms the defect, not float conservativeness.
+Single precision now uses the same native reference kernel: enclose each
+calculation in binary64, then take the greatest binary32 value below its lower
+bound and the least binary32 value above its upper bound. This also applies to
+computed singleton intervals, subnormal results, overflow, and integral-looking
+float values above `2^24`. Outward composition includes both separate rounding
+and FMA contraction, under a contract that forbids reassociation and preserves
+gradual underflow. Explicit `FloatNum` literals are rounded once and remain
+points; compiler-folded values must be injected through this literal API.
+`FloatCast` describes a known monotone conversion. Mixed arithmetic converts its
+integer operands before floating evaluation. Float zero and integral-valued
+floating functions retain a negative LSB, so later operations cannot wrap as int32.
+
+`*Bounds` provides a conservative mathematical reference, independently of the
+target libm. Public transcendental operations still add the existing two-ULP
+margin when `libmCompensation()` is enabled. Inclusion of **executed libm values**
+therefore requires a target whose result is at most two representable steps
+from the correctly rounded value, with the exact special values and function
+ranges used by the clamp. This is the precise contract of the historical
+`nextafter` margin; a published absolute error in ULPs must be translated into
+that contract, especially at binade boundaries. Arbitrary libms remain uncertified.
+Disabling the margin requires a correctly-rounded target. This distinction
+applies equally to float and double. NaN remains the empty convention, rather
+than a separate possible-value flag. Single-mode reciprocal and negative powers
+of merged signed zero use a wider hull to include both infinite signs.
+
+Float affine arithmetic collapses floating add/subtract/multiply/divide and
+casts to a constant interval hull over the horizon. Rounded staircases cannot
+in general be bounded by chords through their rounded endpoints. This sacrifices
+rate precision; recurrence invariants still require separate verification.
+
+[FLOAT_COUNTEREXAMPLES.md](FLOAT_COUNTEREXAMPLES.md) records the six original
+failures and their corrected bounds. The negative-delay example now yields
+`[-1, 8195]`. All seven witnesses (including huge sine) are ordinary inclusion
+tests in `FloatConservativenessTests`; CTest has no expected-gap mode.
+`FloatBoundsTests` broadens coverage, and optional MPFR targets verify both the
+mathematical enclosure and binary32 rounding, including subnormals and overflow.
+Passing finite tests supports these rules; it is not a proof for every Faust
+program, unrestricted compiler transformations, recurrence or target libm.
 
 ## Building and optional MPFR oracle
 

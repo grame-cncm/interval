@@ -2,7 +2,7 @@ These notes on testing the intervals results are destined to future library cont
 
 # Test suites
 
-The project has four dependency-free executables and two optional oracle targets:
+The project has five dependency-free executables and three optional oracle targets:
 
 - `IntervalTests` contains fast, deterministic regression tests. It checks interval bounds and
   LSB values strictly and is the suite executed by CTest and CI.
@@ -18,33 +18,38 @@ The project has four dependency-free executables and two optional oracle targets
   transcendental functions, exact modulo/remainder, powers, scaling and interval
   images. MPFR is linked to this test executable, never to the interval library.
 
-- `FloatConservativenessTests` checks six missing inclusions in the current float
-  rules, including a negative integer delay under strict separate arithmetic.
-  Direct execution requires inclusion and currently returns 1. CTest explicitly
-  uses `--expect-known-gaps`, labeled `known-float-gaps`: success reproduces a
-  known defect, rather than certifying float inclusion. A fixed rule will make
-  this known-gap mode fail until its witness moves to the ordinary regressions.
-- `FloatConservativenessOracleTests`, enabled by the same MPFR option, checks the
-  witnesses against MPFR at 24 bits, rounding after every target operation. These
-  cases have normal or zero finite results and need no binary32 exponent-range emulation.
-  The host sine and the correctly-rounded MPFR reference are checked separately.
+- `FloatConservativenessTests` requires inclusion for the six original float
+  counterexamples and the large-sine diagnostic. All seven cases must now pass;
+  CTest uses the ordinary driver, with no expected-failure/known-gap mode.
+- `FloatBoundsTests` checks literals versus computed points, mixed conversions,
+  float nature (including zero and integral-valued functions), signed-zero
+  infinities, UI domains, and the affine bridge. Fixed bit-pattern samples cover
+  all binary32 exponents, point/nonpoint arithmetic and 4000 FMA contractions;
+  sixteen unary functions also cover domain and overflow/underflow thresholds.
+- `FloatConservativenessOracleTests`, enabled by the MPFR option, verifies the
+  seven original witnesses at precision 24, rounding after each target operation.
+  Their target results are normal or zero and need no subnormal emulation.
+- `FloatBoundsOracleTests` adds independent 256-bit directed real references and
+  correctly rounded binary32 references. It sets MPFR precision 24, exponent
+  limits -148/128, and uses `mpfr_subnormalize` with each operation's ternary
+  result to emulate gradual underflow without double rounding. Limits are restored
+  before the wide reference or any interval-library call. See the
+  [MPFR subnormal-emulation documentation](https://www.mpfr.org/mpfr-current/mpfr.html#Exception-Related-Functions).
 
-See [FLOAT_COUNTEREXAMPLES.md](FLOAT_COUNTEREXAMPLES.md) for exact calculations
-and reproduction commands. Run an ordinary inclusion check, expected to fail:
+See [FLOAT_COUNTEREXAMPLES.md](FLOAT_COUNTEREXAMPLES.md) for the original failures,
+corrected bounds and reproduction commands. Both direct execution and CTest
+require inclusion and return zero on success:
 
 ```sh
 ./build/FloatConservativenessTests --require-inclusion
 ./build/FloatConservativenessTests --case delay
+./build/FloatConservativenessTests --case sine-large
+ctest --test-dir build -L float-inclusion --output-on-failure
 ```
 
-The optional executable has the same arguments. Invalid inputs/arguments return 2
-and are not accepted by the known-gap mode. These targets do not modify the
-production float implementation.
-
-An opt-in `--case sine-large` diagnostic also exposes an undefined infinity-to-int
-conversion in the analyzer's precision metadata under UBSan. It is deliberately
-excluded from the six default inclusion witnesses, which run without sanitizer
-errors. See the counterexample document for the instrumented build command.
+The optional witness executable has the same arguments. Invalid arguments return
+2; the old `--expect-known-gaps` mode is removed. UBSan must also pass the large
+sine case, which formerly exposed an infinity-to-int metadata conversion.
 
 No external numerical library is required for the default tests. For the oracle,
 install the MPFR/GMP development files described in README.md and add

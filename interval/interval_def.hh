@@ -21,6 +21,7 @@
 
 #include <limits.h>
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
@@ -52,8 +53,8 @@ inline int& programPrecision()
 /**
  * Public API: legacy target-libm compensation, enabled by default. The two-ULP
  * widening is a configurable assumption, not a universal error guarantee.
- * Double reference bounds use the native kernel independently of this setting; other modes
- * still use the host libm. Disable only under an established target/host contract.
+ * Float/double reference bounds use the native kernel independently of this setting;
+ * quad/fixed retain the host libm. Disable only under an established target contract.
  */
 inline bool& libmCompensation()
 {
@@ -62,32 +63,59 @@ inline bool& libmCompensation()
 }
 
 /**
- * Public API: legacy conversion of a bound to the program precision. Double bounds
- * are unchanged; conservative double operations round before construction.
- * A bound of a float-carried value, at the precision of the program. Round to nearest
- * is monotone : for a monotone operation, the bound computed in double then rounded
- * to float is the value the program computes at that bound. For +, -, *, / and sqrt
- * of floats, the double rounding is innocuous (53 >= 2*24 + 2) : rounding in double
- * then in float gives the float the program computes, even when the double result is
- * not exact. Not covered : the C++ compiler's FMA contraction and reassociation, the
- * libm (not correctly rounded) ; the decisions keep their own margin for those (the
- * guard of a table access near its edges). Round to nearest, not outward : a constant
- * stays a point. Subnormal results and underflow to zero follow the same rounding.
- * An integer bound beyond 2^24 is left unchanged because an integer value may carry
- * a float precision by default.
+ * Public API: round an explicitly known literal/conversion to program precision.
+ * Float selects nearest-even independently of the host rounding mode, including
+ * gradual underflow. Handle overflow before narrowing a finite double.
+ * Double is unchanged. Computed/domain bounds must use programDirectedBound instead:
+ * singleton shape alone does not identify a literal or prove exact arithmetic.
  */
 inline double programBound(double b)
 {
     if (programPrecision() != 1 || std::isnan(b) || std::isinf(b)) return b;
-    if (std::fabs(b) >= 16777216.0 && b == std::floor(b)) return b;
-    return double(float(b));
+    // Nearest-even overflows only at the midpoint above max-finite. Avoid an
+    // out-of-range C++ narrowing cast even below that midpoint.
+    if (b > std::numeric_limits<float>::max())
+        return b >= 0x1.ffffffp127 ? HUGE_VAL : double(std::numeric_limits<float>::max());
+    if (b < -std::numeric_limits<float>::max())
+        return b <= -0x1.ffffffp127 ? -HUGE_VAL : -double(std::numeric_limits<float>::max());
+    const float rounded = float(b);
+    if (double(rounded) == b) return b;
+    // Any IEEE host rounding gives an adjacent float. Its neighbour brackets b;
+    // the sum and midpoint of two adjacent binary32 values are exact in binary64.
+    // Integer parity selects the even significand at a midpoint, without fenv changes.
+    const float lower = double(rounded) < b ? rounded : std::nextafter(rounded, -INFINITY);
+    const float upper = double(rounded) > b ? rounded : std::nextafter(rounded, INFINITY);
+    const double midpoint = (double(lower) + double(upper)) * 0.5;
+    if (b < midpoint) return double(lower);
+    if (b > midpoint) return double(upper);
+    return double((std::bit_cast<uint32_t>(lower) & 1u) == 0 ? lower : upper);
+}
+
+/**
+ * Public API: enclose an exact binary64 bound in program precision, downward for
+ * a lower endpoint and upward for an upper endpoint. Float narrowing is corrected
+ * by comparison and nextafter; exact floats stay unchanged. Overflow brackets the
+ * finite real value between max-finite and infinity, and underflow between zero
+ * and the least subnormal. Integer-looking floating bounds receive the same rule.
+ * Double/quad/fixed are unchanged; IEEE conversion and gradual underflow are assumed.
+ */
+inline double programDirectedBound(double b, bool upper)
+{
+    if (programPrecision() != 1 || !std::isfinite(b)) return b;
+    const double largest = std::numeric_limits<float>::max();
+    if (b > largest) return upper ? HUGE_VAL : largest;
+    if (b < -largest) return upper ? -largest : -HUGE_VAL;
+    const float rounded = float(b);
+    if ((upper && double(rounded) < b) || (!upper && double(rounded) > b))
+        return double(std::nextafter(rounded, upper ? INFINITY : -INFINITY));
+    return double(rounded);
 }
 
 /**
  * k ulps of the program's precision at the magnitude of [lo, hi] : the margin of a rule
  * that reasons on reals (the hull of a convex combination), whose float evaluation can
- * leave the hull by a few roundings. The elementary operations need none : their
- * bounds are computed at the precision of the program (programBound).
+ * leave the hull by a few roundings. Elementary float/double operations use
+ * directed bounds instead of this heuristic margin.
  */
 inline double ulpMargin(double lo, double hi, int k)
 {
@@ -122,7 +150,9 @@ class interval {
         if (n == 0.0 && m == 0.0) {
             fLo  = 0.0;
             fHi  = 0.0;
-            fLSB = 0;
+            // Float zero must retain its nature: a later mixed operation still
+            // converts integer operands to float instead of wrapping as int32.
+            fLSB = programPrecision() == 1 && lsb < 0 ? lsb : 0;
             // std::cerr << "Warning: creating an interval with both bounds equal to zero."
             //           << std::endl;
             return;
@@ -139,14 +169,11 @@ class interval {
         } else {
             fLo = std::min(n, m);
             fHi = std::max(n, m);
-            // a float-carried value : its bounds at the precision of the program
+            // A computed/domain point is not a literal: independently enclose
+            // both endpoints, even when analyzer rounding collapsed them.
             if (fLSB < 0) {
-                fLo = programBound(fLo);
-                fHi = programBound(fHi);
-                // Underflow can turn a nonzero interval into the exact zero point.
-                if (fLo == 0 && fHi == 0) {
-                    fLSB = 0;
-                }
+                fLo = programDirectedBound(fLo, false);
+                fHi = programDirectedBound(fHi, true);
             }
         }
     }
@@ -387,9 +414,9 @@ inline bool operator>(const interval& i, const interval& j)
 /**
  * The bounds of a libm function, compensated : 2 ulps of the program's precision
  * outward, within the image [fmin, fmax] of the function (sin stays in [-1, 1], exp
- * stays >= 0), a bound of exactly 0 excepted. In double mode a singleton is not
- * automatically a folded constant, so it receives the target margin too. Other
- * modes retain the historical singleton exemption. This margin is heuristic.
+ * stays >= 0), a bound of exactly 0 excepted. A float/double singleton is not
+ * automatically a folded constant, so it receives the target margin too.
+ * Quad/fixed retain the historical singleton exemption. This margin is heuristic.
  */
 inline double ulpStep(double b, double dir)
 {
@@ -401,11 +428,11 @@ inline double ulpStep(double b, double dir)
 
 inline interval libmBounds(const interval& r, double fmin, double fmax)
 {
-    // A singleton alone is not evidence that Faust folded an operation. Double
+    // A singleton alone is not evidence that Faust folded an operation. Float/double
     // references are certified independently; the legacy two-ULP target margin
     // still applies to singleton results unless they are explicitly integer.
     if (!libmCompensation() || r.isEmpty() || r.lsb() >= 0 ||
-        (programPrecision() != 2 && r.isconst())) return r;
+        (programPrecision() != 1 && programPrecision() != 2 && r.isconst())) return r;
     // a bound of exactly 0 stays : the C standard (annex F) makes the libm exact there
     // (sin(+-0) = +-0, tan(0) = 0, log(1) = 0, pow(0, y) = 0...), and a bound of 0 comes
     // from such an exact point

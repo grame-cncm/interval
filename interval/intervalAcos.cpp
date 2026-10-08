@@ -29,12 +29,12 @@ namespace itv {
 
 static const interval AcosDomain(-1, 1, 0);  // this interval needs 0 digits of precision
 
-// Public API: numeric acos image on its valid domain. In double precision,
-// the native kernel encloses endpoints and extrema; other precisions retain
+// Public API: numeric acos image on its valid domain. In float/double,
+// the native kernel encloses endpoints and extrema; quad/fixed retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::AcosBounds(const interval& x) const
 {
-    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Acos, x);
+    if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Acos, x);
     interval i = intersection(AcosDomain, x);  // TODO: warn about interval violations
     if (i.isEmpty()) {
         return empty();

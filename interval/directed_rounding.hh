@@ -28,6 +28,26 @@ enum class UnaryOp {
     Exp, Log, Log10, Sin, Sinh, Tan, Tanh
 };
 
+// Float reuses the binary64 proof, then interval construction narrows outward.
+// Quad/fixed keep their old rules; the analyzer never narrows a reference step.
+inline bool usesNativeBounds() { return programPrecision() == 1 || programPrecision() == 2; }
+
+// Mixed floating/int expressions convert integer operands to the target float
+// before evaluation. Enclosing that conversion avoids computing on a non-float
+// integer endpoint (e.g. 16777217). Already-floating domains are unchanged.
+inline interval floatingOperand(const interval& x)
+{
+    return programPrecision() == 1 && x.lsb() >= 0
+        ? interval(programBound(x.lo()), programBound(x.hi()), -24) : x;
+}
+
+// A numerical floating result must not reenter int32 wrapping merely because
+// its estimated grid has a nonnegative LSB. Explicit IntCast still marks integers.
+inline int floatingLSB(int lsb)
+{
+    return programPrecision() == 1 ? std::min(lsb, -1) : lsb;
+}
+
 // LSB is the legacy integer marker, but an out-of-range or infinite bound must
 // never reach a C++ int cast. Such corridors are handled numerically instead.
 inline bool hasInt32Bounds(const interval& x)
@@ -50,7 +70,8 @@ double directedPi(Direction direction);
 // The exponent is a bounded internal range-reduction exponent, not arbitrary int.
 double directedScale(double x, int exponent, Direction direction);
 
-// Numeric image on the valid real domain, with outward binary64 bounds. NaN is
+// Numeric image on the valid real domain: outward binary64 reference steps,
+// then interval construction narrows outward in float mode. NaN is
 // still represented by the library's historical empty convention, not tracked.
 // The LSB stamp is a fallback estimate, separate from the bound inclusion proof.
 interval doubleUnaryBounds(UnaryOp op, const interval& x);

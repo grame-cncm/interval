@@ -24,9 +24,9 @@ interval floatDomain(float lo, float hi)
     return {double(lo), double(hi), -24};
 }
 
-// Each witness checks inclusion rather than freezing the library's erroneous
-// endpoints. Premises concern the inputs/target execution only; a future wider
-// sound result will satisfy the ordinary check and fail the known-gap mode.
+// Each witness checks inclusion rather than freezing historical erroneous
+// endpoints. Premises concern the inputs/target execution only; a wider sound
+// result satisfies the regression just as a tighter sound result does.
 struct Witness {
     std::string_view name;
     interval predicted;
@@ -105,8 +105,8 @@ Witness contraction(const interval_algebra& algebra)
             floatDomain(a, a).has(a) && floatDomain(b, b).has(b)};
 }
 
-// The small argument isolates enclosure failure without triggering the separate
-// precision-metadata overflow exposed by the opt-in large-argument diagnostic.
+// Keep both a modest argument and the historically broken huge argument: the
+// former tests tight reduction and the latter tests the conservative fallback.
 Witness sineAt(const interval_algebra& algebra, float input, std::string_view name)
 {
     volatile float x = input;
@@ -120,8 +120,8 @@ Witness sineAt(const interval_algebra& algebra, float input, std::string_view na
 
 Witness sine(const interval_algebra& algebra) { return sineAt(algebra, 100.0f, "sine"); }
 
-// At this magnitude exactPrecisionUnary subtracts indistinguishable evaluations,
-// then casts log2(0) to int. UBSan must expose that bug, rather than suppress it.
+// The legacy path cast log2(0) to int at this magnitude. The native reference
+// avoids that metadata path and returns a sound trig range for huge arguments.
 Witness largeSine(const interval_algebra& algebra)
 {
     return sineAt(algebra, 1.0e20f, "sine-large");
@@ -173,21 +173,18 @@ double oracleValue(std::string_view name)
 
 }  // namespace
 
-// Test driver: normal execution demands inclusion and currently fails. The
-// explicit known-gap mode keeps CTest useful while documenting these defects;
-// invalid inputs remain errors, and a repaired rule must leave the known-gap set.
+// Test driver: require inclusion for the original counterexamples and the large
+// sine diagnostic. Every excluded value or invalid witness now fails CTest too.
 int main(int argc, char** argv)
 {
-    bool expectGaps = false;
     std::string_view selected;
     for (int i = 1; i < argc; ++i) {
         const std::string_view argument = argv[i];
-        if (argument == "--expect-known-gaps") expectGaps = true;
-        else if (argument == "--require-inclusion") expectGaps = false;
+        if (argument == "--require-inclusion") {}
         else if (argument == "--case" && i + 1 < argc) selected = argv[++i];
         else {
             std::cerr << "Usage: " << argv[0]
-                      << " [--require-inclusion|--expect-known-gaps] [--case NAME]\n";
+                      << " [--require-inclusion] [--case NAME]\n";
             return 2;
         }
     }
@@ -202,22 +199,20 @@ int main(int argc, char** argv)
     itv::programPrecision() = 1;
     itv::libmCompensation() = true;
     const interval_algebra algebra;
-    // Build witnesses lazily so --case really isolates a rule. The large sine
-    // diagnostic is opt-in: its analyzer UB must not taint the six inclusion tests.
+    // Build witnesses lazily so --case isolates a rule. Large sine now belongs
+    // to the default suite: the conservative path must avoid precision-metadata UB.
     struct Case {
         std::string_view name;
         Witness (*build)(const interval_algebra&);
-        bool optIn;
     };
     const std::array<Case, 7> cases{{
-        {"addition", addition, false}, {"multiplication", multiplication, false},
-        {"delay", delay, false}, {"conversion", conversion, false},
-        {"contraction", contraction, false}, {"sine", sine, false},
-        {"sine-large", largeSine, true}}};
+        {"addition", addition}, {"multiplication", multiplication},
+        {"delay", delay}, {"conversion", conversion},
+        {"contraction", contraction}, {"sine", sine}, {"sine-large", largeSine}}};
     std::cout << std::setprecision(17);
     int tested = 0, failures = 0;
     for (const auto& test : cases) {
-        if ((!selected.empty() && selected != test.name) || (selected.empty() && test.optIn)) continue;
+        if (!selected.empty() && selected != test.name) continue;
         const Witness witness = test.build(algebra);
         ++tested;
         if (!witness.validInputs || !std::isfinite(witness.observed)) {
@@ -236,10 +231,8 @@ int main(int argc, char** argv)
         }
         included = included && witness.predicted.has(reference);
 #endif
-        const bool success = expectGaps ? !included : included;
-        failures += !success;
-        std::cout << (expectGaps ? (success ? "KNOWN GAP: " : "GAP NOW COVERED: ")
-                                : (success ? "PASS inclusion: " : "FAIL inclusion: "))
+        failures += !included;
+        std::cout << (included ? "PASS inclusion: " : "FAIL inclusion: ")
                   << witness.name << "\n  interval=[" << witness.predicted.lo()
                   << ", " << witness.predicted.hi() << "] observed=" << witness.observed
                   << " observed_included=" << witness.predicted.has(witness.observed);
@@ -253,8 +246,6 @@ int main(int argc, char** argv)
         std::cerr << "Unknown witness: " << selected << '\n';
         return 2;
     }
-    std::cout << tested << " checks, " << failures << " failures ("
-              << (expectGaps ? "expected known gaps; this does not certify inclusion"
-                             : "required float inclusion") << ").\n";
+    std::cout << tested << " checks, " << failures << " failures (required float inclusion).\n";
     return failures ? 1 : 0;
 }

@@ -14,6 +14,7 @@
  */
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
@@ -35,6 +36,7 @@ interval interval_algebra::NumEntry(const interval& name, const interval& init, 
         lsb = std::min(lsb, (int)std::log2(step.lo()));
     }
 
-    return {lo.lo(), hi.hi(), lsb};
+    // UI zones carry float values even when their declared step is integral.
+    return {lo.lo(), hi.hi(), detail::floatingLSB(lsb)};
 }
 }  // namespace itv

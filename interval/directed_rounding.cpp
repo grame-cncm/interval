@@ -240,8 +240,9 @@ double directedPi(Direction direction)
 
 // Numeric image on the valid real domain; endpoint evaluation is supplemented by
 // all interior extrema/poles. LSB remains an estimate, not part of this proof.
-interval doubleUnaryBounds(UnaryOp op, const interval& x)
+interval doubleUnaryBounds(UnaryOp op, const interval& input)
 {
+    const interval x = floatingOperand(input);
     if (x.isEmpty()) return empty();
     double lo = x.lo(), hi = x.hi();
     const int lsb = std::min(x.lsb(), -24);
@@ -290,8 +291,9 @@ interval doubleUnaryBounds(UnaryOp op, const interval& x)
 
 // Numeric atan2 image. Rectangular extrema are corners except at the negative
 // x-axis cut or the origin; include both signs of pi whenever that cut is possible.
-interval doubleAtan2Bounds(const interval& y, const interval& x)
+interval doubleAtan2Bounds(const interval& yInput, const interval& xInput)
 {
+    const interval y = floatingOperand(yInput), x = floatingOperand(xInput);
     if (x.isEmpty() || y.isEmpty()) return empty();
     const int lsb = std::min({x.lsb(), y.lsb(), -24});
     if (x.lo() <= 0 && y.hasZero()) {
@@ -312,10 +314,15 @@ interval doubleAtan2Bounds(const interval& y, const interval& x)
 // Numeric pow image. Positive bases use monotonicity in each coordinate (the
 // direction changes at base 1/exponent 0, but their value 1 is covered by corners).
 // Negative bases contribute only integer exponents, separated by parity.
-interval doublePowBounds(const interval& x, const interval& y)
+interval doublePowBounds(const interval& xInput, const interval& yInput)
 {
+    const interval x = floatingOperand(xInput), y = floatingOperand(yInput);
     if (x.isEmpty() || y.isEmpty()) return empty();
     const int lsb = std::min({x.lsb(), y.lsb(), -24});
+    // The interval representation merges signed zero. Negative powers of -0
+    // can be -inf for odd integral exponents; keep that missing sign in float.
+    if (programPrecision() == 1 && x.hasZero() && y.lo() < 0)
+        return {-HUGE_VAL, HUGE_VAL, lsb};
     interval result = empty();
     if (x.hi() >= 0) result = positivePower(std::max(0.0, x.lo()), x.hi(), y.lo(), y.hi(), lsb);
     // IEEE pow also defines some noninteger powers of -inf, although the
@@ -349,8 +356,9 @@ interval doublePowBounds(const interval& x, const interval& y)
 
 // Numeric fmod image. The sign follows x and |fmod| <= min(|x|, |y|); this
 // deliberately avoids a rounded quotient and an unsafe conversion to int.
-interval doubleFmodBounds(const interval& x, const interval& y)
+interval doubleFmodBounds(const interval& xInput, const interval& yInput)
 {
+    const interval x = floatingOperand(xInput), y = floatingOperand(yInput);
     if (x.isEmpty() || y.isEmpty() || y.isZero()) return empty();
     const int lsb = std::min({x.lsb(), y.lsb(), -24});
     if (x.isconst() && y.isconst()) {

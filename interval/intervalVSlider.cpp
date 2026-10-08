@@ -15,6 +15,7 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
@@ -37,6 +38,7 @@ interval interval_algebra::VSlider(const interval& name, const interval& init, c
             (int)log2(step.lo()));  // and that associated to the smallest value the step can take
     }
 
-    return {lo.lo(), hi.hi(), lsb};  // TODO: step, init
+    // UI zones carry float values even when their declared step is integral.
+    return {lo.lo(), hi.hi(), detail::floatingLSB(lsb)};  // TODO: step, init
 }
 }  // namespace itv

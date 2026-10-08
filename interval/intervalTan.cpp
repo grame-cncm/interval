@@ -33,12 +33,12 @@ static double tanPi(double x)
     return std::tan(x * M_PI);
 }
 
-// Public API: numeric tan image on its valid domain. In double precision,
-// the native kernel encloses endpoints and extrema; other precisions retain
+// Public API: numeric tan image on its valid domain. In float/double,
+// the native kernel encloses endpoints and extrema; quad/fixed retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::TanBounds(const interval& x) const
 {
-    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Tan, x);
+    if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Tan, x);
     if (x.isEmpty()) {
         return empty();
     }

@@ -227,20 +227,22 @@ int main()
         // single precision : the bounds of a float-carried value are floats
         programPrecision() = 1;
         check("single: 0.1 is the float 0.1f", true, interval(0.1).lo() == double(0.1f));
-        check("single: a constant stays a point", true,
-              algebra.Add(interval(0.1), interval(0.2)).isconst());
-        check("single: 0.1 + 0.2 is the float sum the program computes", true,
-              algebra.Add(interval(0.1), interval(0.2)).lo() == double(0.1f + 0.2f));
-        check("single: a bound between two floats rounds to the nearest float", true,
+        check("single: an explicit literal stays a point", true, algebra.FloatNum(0.1).is(0.1f));
+        check("single: a computed point encloses its rounding error", true,
+              !algebra.Add(interval(0.1), interval(0.2)).isconst());
+        check("single: 0.1 + 0.2 contains the float sum the program computes", true,
+              algebra.Add(interval(0.1), interval(0.2)).has(double(0.1f + 0.2f)));
+        check("single: an upper bound between two floats rounds upward", true,
               interval(0, 99.99999999).hi() == 100.0);
         check("single: an integer interval (lsb >= 0) is not rounded", true,
               interval(0, 16777217.0, 0).hi() == 16777217.0);
-        check("single: an integer bound beyond 2^24 is kept", true,
-              interval(0, 16777217.0).hi() == 16777217.0);
+        check("single: an integer-looking floating bound rounds upward", true,
+              interval(0, 16777217.0).hi() == 16777218.0);
         check("single: a tiny positive bound underflows to zero", true,
               interval(1e-300, 1).lo() == 0);
-        checkExact("single: underflow normalizes a zero point", interval(1e-300, 1e-300, -149),
-                   interval(0));
+        checkExact("single: a tiny computed point encloses rather than discards its value",
+                   interval(1e-300, 1e-300, -149),
+                   interval(0, double(std::numeric_limits<float>::denorm_min()), -149));
         // Consumers of an underflowed bound must handle zero before estimating
         // precision; derivatives at these singular points give NaN or infinity.
         const interval underflowed(1e-300);
@@ -249,8 +251,9 @@ int main()
         checkExact("single: log10 of underflowed zero", algebra.Log10(underflowed),
                    interval(-HUGE_VAL, -HUGE_VAL, -24));
         checkExact("single: reciprocal of underflowed zero", algebra.Inv(underflowed),
-                   interval(HUGE_VAL, HUGE_VAL, -24));
-        checkExact("single: sqrt of underflowed zero", algebra.Sqrt(underflowed), interval(0));
+                   interval(-HUGE_VAL, HUGE_VAL, -24));
+        checkExact("single: sqrt of underflowed zero retains floating nature",
+                   algebra.Sqrt(underflowed), interval(0, 0, -24));
         // Check both signs and the transition from a subnormal result to zero.
         // Volatile inputs ensure the reference executes at float precision.
         volatile float smallestNormal = std::numeric_limits<float>::min();
@@ -299,7 +302,7 @@ int main()
               ulpMargin(0, 100, 4) == 4 * 0x1p-52 * 100);
 
         // the compensation of the libm : 2 ulps outward, within the image of the function,
-        // never for a point, an exact 0 or an integer result
+        // including runtime points, except exact zero and explicit integer results
         {
             programPrecision() = 1;
             interval x(0, 1.00000596);
@@ -312,7 +315,8 @@ int main()
             check("libm: sin keeps its exact 0 bound", true, s.lo() == 0);
             check("libm: the image of sin caps the widening", true,
                   algebra.Sin(interval(0, 7)).hi() == 1 && algebra.Sin(interval(0, 7)).lo() == -1);
-            check("libm: a constant stays a point", true, algebra.Sin(interval(0.5)).isconst());
+            check("libm: a runtime point receives an enclosure", true,
+                  !algebra.Sin(algebra.FloatNum(0.5)).isconst());
             check("libm: exp stays >= 0", true, algebra.Exp(interval(-200, 0)).lo() >= 0);
             // the witness : 118.83905 * sinf(1.00000596) is 100.0 in float, one ulp above the
             // bound computed with sin in double ; the compensated bound covers it

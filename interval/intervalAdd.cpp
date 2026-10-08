@@ -36,7 +36,7 @@ static double addint(double x, double y)
     return (int)x + (int)y;
 }
 
-// Public API: enclose addition; double floating bounds round outward at each
+// Public API: enclose addition; float/double floating bounds round outward at each
 // endpoint, while the existing int32 wrapping and other precision paths remain.
 interval interval_algebra::Add(const interval& x, const interval& y) const
 {
@@ -75,12 +75,13 @@ interval interval_algebra::Add(const interval& x, const interval& y) const
         return {(double)(xlo + ylo), (double)(xhi + yhi), std::min(x.lsb(), y.lsb())};
     }
 
-    if (programPrecision() == 2) {
-        const double lo = detail::directedBinary(detail::BinaryOp::Add, x.lo(), y.lo(), detail::Direction::Down);
-        const double hi = detail::directedBinary(detail::BinaryOp::Add, x.hi(), y.hi(), detail::Direction::Up);
+    if (detail::usesNativeBounds()) {
+        const interval a = detail::floatingOperand(x), b = detail::floatingOperand(y);
+        const double lo = detail::directedBinary(detail::BinaryOp::Add, a.lo(), b.lo(), detail::Direction::Down);
+        const double hi = detail::directedBinary(detail::BinaryOp::Add, a.hi(), b.hi(), detail::Direction::Up);
         // An indeterminate infinite corner must not erase numeric interior values.
         if (std::isnan(lo) || std::isnan(hi)) return {-HUGE_VAL, HUGE_VAL, -24};
-        return {lo, hi, std::min(x.lsb(), y.lsb())};
+        return {lo, hi, detail::floatingLSB(std::min(x.lsb(), y.lsb()))};
     }
     return {x.lo() + y.lo(), x.hi() + y.hi(),
             std::min(x.lsb(), y.lsb())};  // the result of an addition needs to be only as precise

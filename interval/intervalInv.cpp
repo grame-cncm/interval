@@ -34,19 +34,23 @@ static double inv(double x)
 }
 
 // Public API: reciprocal bounds and their LSB estimate; empty stays empty.
-// The exact zero point yields +inf with default floating LSB, preserving the
-// historical unsigned-zero convention without estimating a precision at zero.
-// Double reciprocal endpoints round outward; LSB remains an estimate.
-interval interval_algebra::Inv(const interval& x) const
+// Zero gives both signed infinities in float (signed zero is not tracked); double
+// retains its historical +inf convention. Float/double reciprocal endpoints
+// round outward; LSB remains an estimate.
+interval interval_algebra::Inv(const interval& input) const
 {
+    const interval x = detail::floatingOperand(input);
     if (x.isEmpty()) {
         return empty();
     }
     if (x.isZero()) {
+        // Numeric endpoints do not distinguish +0 from -0. Single precision
+        // must retain both possible signed infinities rather than certify +inf.
+        if (programPrecision() == 1) return {-HUGE_VAL, HUGE_VAL, -24};
         return {HUGE_VAL, HUGE_VAL, -24};
     }
 
-    if (programPrecision() == 2) {
+    if (detail::usesNativeBounds()) {
         const int lsb = std::min(x.lsb(), -24);
         if (x.lo() < 0 && x.hi() > 0) return {-HUGE_VAL, HUGE_VAL, lsb};
         // Zero is normalized as +0 by interval: a negative corridor ending at

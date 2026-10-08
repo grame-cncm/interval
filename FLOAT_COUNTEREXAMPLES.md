@@ -1,6 +1,6 @@
 ---
 title: Contre-exemples en simple précision
-subtitle: Six défauts d’inclusion, dont un retard négatif sans fast-math
+subtitle: Six défauts initiaux et leur correction par arrondi dirigé
 author: Yann Orlarey
 date: 8 octobre 2026
 document-style: article-a4
@@ -19,9 +19,12 @@ language: fr
   - **Diagnostic supplémentaire sur un grand argument** — isoler un comportement indéfini du calcul de précision.
 - **Exécuter les tests** — reproduire les échecs d’inclusion et les vérifier avec l’oracle facultatif.
 - **Ce que ces tests établissent** — préciser la portée des preuves et leur utilisation après correction.
+- **État après correction** — comparer les bornes et définir le contrat effectivement vérifié.
 :::
 
 # Cadre des expériences
+
+**État actuel : les six contre-exemples sont corrigés.** Le diagnostic du grand sinus est également corrigé et intégré aux tests ordinaires. Les sections de calcul ci-dessous conservent les résultats de la version fautive (`9304c44`) ; la dernière section donne les bornes actuelles et la portée de la correction.
 
 Les témoins utilisent directement la bibliothèque de ce dépôt, avec `itv::programPrecision() = 1` et `itv::libmCompensation() = true`. Ils ont été construits à partir du commit `7db5ec3`, sur la branche `fix/interval-bounds-safety`. Ils n’utilisent pas un binaire du compilateur Faust : l’acceptation d’un DSP particulier par Faust n’est pas supposée.
 
@@ -35,9 +38,9 @@ Les six assertions demandent la même propriété :
 v_{\mathrm{exécuté}} \in I_{\mathrm{annoncé}}
 ```
 
-**Les six assertions échouent actuellement.** Les résultats ont été reproduits avec Apple Clang 21, GCC 15, les détecteurs de comportements indéfinis de Clang et Emscripten 3.1.74 sous Node. L’oracle MPFR confirme séparément les valeurs binary32 de ces témoins.
+**Les six assertions échouaient avant correction.** Les résultats ont été reproduits avec Apple Clang 21, GCC 15, les détecteurs de comportements indéfinis de Clang et Emscripten 3.1.74 sous Node. L’oracle MPFR confirme séparément les valeurs binary32 de ces témoins.
 
-| Test | Intervalle annoncé | Valeur exécutée |
+| Test | Intervalle annoncé avant correction | Valeur exécutée |
 |---|---|---:|
 | `addition` | `[16777217, 16777217]` | `16777216` |
 | `multiplication` | `[16785409, 16793604]` | `16785408` |
@@ -148,32 +151,32 @@ L’entrée est le float exactement représentable `100.0f`. La bibliothèque an
 
 Le problème vient de [SinBounds](interval/intervalSin.cpp) : le mode float réduit l’argument avec `fmod(x, 2*M_PI)`, où `M_PI` est une approximation double de π, puis construit un intervalle qui arrondit la phase réduite en float. Le sinus de cette phase arrondie ne reproduit pas le sinus de l’entrée initiale. Une valeur ponctuelle obtenue dans cet intermédiaire n’est pas une preuve que cette réduction conserve la valeur recherchée.
 
-La compensation libm est activée dans le test. Le résultat ponctuel est actuellement exempt de cette compensation en mode float. Les deux valeurs diffèrent de quatre ULPs binary32 à cette magnitude ; une marge de deux ULPs ne suffirait pas ici. L’erreur concerne aussi le calcul de référence de l’analyseur, pas seulement l’arrondi de la libm cible.
+La compensation libm est activée dans le test. Le résultat ponctuel était exempt de cette compensation en mode float avant correction. Les deux valeurs diffèrent de quatre ULPs binary32 à cette magnitude ; une marge de deux ULPs ne suffirait pas ici. L’erreur concerne aussi le calcul de référence de l’analyseur, pas seulement l’arrondi de la libm cible.
 
 La suite compare la valeur de la libm réellement exécutée. Sa variante MPFR compare en plus le sinus mathématique correctement arrondi en binary32, sans présumer que toute libm fournit universellement ce même arrondi.
 
 ## Diagnostic supplémentaire sur un grand argument
 
-Le cas optionnel `sine-large` utilise `1.0e20f`, dont la valeur exacte est `100000002004087734272`. Il ne fait pas partie des six assertions précédentes, car il révèle **un comportement indéfini dans l’analyseur**.
+Le cas `sine-large`, initialement optionnel, utilise `1.0e20f`, dont la valeur exacte est `100000002004087734272`. Il ne faisait pas partie des six assertions initiales, car il révélait **un comportement indéfini dans l’analyseur**. Il appartient maintenant à la suite ordinaire : le noyau conservateur ne passe plus par cette estimation de précision, et la fonction d’estimation vérifie aussi sa valeur avant conversion.
 
 Dans [exactPrecisionUnary](interval/precision_utils.hh), l’évaluation de `sin(x + u) - sin(x)` donne zéro pour ce grand argument et le petit pas utilisé. Le calcul suivant produit `log2(0) = -∞`, puis tente une conversion en `int`, qui n’est pas définie. La vérification ultérieure de `INT_MIN` dans `SinBounds` arrive trop tard pour rendre cette conversion valide.
 
-Dans une construction instrumentée, le diagnostic s’arrête avec :
+Avant correction, dans une construction instrumentée, le diagnostic s’arrêtait avec :
 
 ```text
 precision_utils.hh:62:15: runtime error:
 -inf is outside the range of representable values of type 'int'
 ```
 
-Sans instrumentation, les constructions natives testées affichent un intervalle ponctuel proche de `−0.17085628`, contre un sinus float et une référence MPFR proches de `0.65657669`. Ce résultat illustre en outre la faiblesse de la réduction avec un `2π` approché pour les grands arguments. **Il ne constitue pas une preuve d’exécution C++ définie**, contrairement aux six témoins principaux : l’analyseur a déjà rencontré un comportement indéfini.
+Avant correction, sans instrumentation, les constructions natives testées affichaient un intervalle ponctuel proche de `−0.17085628`, contre un sinus float et une référence MPFR proches de `0.65657669`. Ce résultat illustre en outre la faiblesse de la réduction avec un `2π` approché pour les grands arguments. **Il ne constitue pas une preuve d’exécution C++ définie**, contrairement aux six témoins principaux : l’analyseur a déjà rencontré un comportement indéfini.
 
-Le diagnostic reste exécutable séparément et n’est pas masqué dans les tests :
+Le cas reste exécutable séparément et exige maintenant une inclusion sans comportement indéfini :
 
 ```sh
 ./build-float-witnesses/FloatConservativenessTests --case sine-large
 ```
 
-Pour reproduire le diagnostic de conversion :
+Pour vérifier la disparition du diagnostic de conversion :
 
 ```sh
 cmake -S . -B build-float-ubsan -DNOTIDY=ON \
@@ -183,7 +186,7 @@ cmake --build build-float-ubsan --parallel
 ./build-float-ubsan/FloatConservativenessTests --case sine-large
 ```
 
-Les six cas principaux passent leurs contrôles de validité avec cette instrumentation ; leurs assertions d’inclusion échouent toujours. Le cas supplémentaire s’arrête sur le comportement indéfini.
+Les sept cas passent désormais avec cette instrumentation, sans erreur de conversion ni échec d’inclusion.
 
 # Exécuter les tests
 
@@ -195,7 +198,7 @@ cmake --build build-float-witnesses --parallel
 ./build-float-witnesses/FloatConservativenessTests --require-inclusion
 ```
 
-La dernière commande retourne actuellement **le code `1` et six échecs d’inclusion**. Chaque échec imprime l’intervalle annoncé et la valeur exclue. Un cas peut être exécuté seul :
+La dernière commande retourne désormais **le code `0` et sept inclusions réussies**. Au commit `9304c44`, elle retournait `1` avec six échecs. Chaque cas imprime l’intervalle annoncé et la valeur exécutée. Un cas peut être exécuté seul :
 
 ```sh
 ./build-float-witnesses/FloatConservativenessTests --case delay
@@ -210,7 +213,7 @@ cmake --build build-float-oracle --parallel
 ./build-float-oracle/FloatConservativenessOracleTests --require-inclusion
 ```
 
-Cette dernière commande retourne également `1`. MPFR utilise une précision de 24 bits et arrondit **après chaque opération du programme témoin**. Tous les résultats intermédiaires des six cas sont finis, normaux ou nuls ; aucun ne nécessite un arrondi sous-normal. Il n’est donc pas nécessaire d’émuler ici le sous-dépassement binary32. Ce dispositif n’est pas encore un oracle général couvrant toutes les particularités du float.
+Cette dernière commande retourne également `0`. MPFR utilise une précision de 24 bits et arrondit **après chaque opération du programme témoin**. Tous les résultats intermédiaires des sept cas sont finis, normaux ou nuls ; aucun ne nécessite un arrondi sous-normal. Il n’est donc pas nécessaire d’émuler ici le sous-dépassement binary32. Ce dispositif n’est pas encore un oracle général couvrant toutes les particularités du float.
 
 Pour WebAssembly, après activation d’Emscripten :
 
@@ -221,13 +224,19 @@ cmake --build build-wasm-float --parallel
 node build-wasm-float/FloatConservativenessTests.js --require-inclusion
 ```
 
-CTest emploie un mode explicitement différent :
+CTest exige maintenant la même inclusion que l’exécution directe :
 
 ```sh
-ctest --test-dir build-float-witnesses -L known-float-gaps -V
+ctest --test-dir build-float-witnesses -L float-inclusion --output-on-failure
 ```
 
-Les tests enregistrés passent `--expect-known-gaps`. Leur succès signifie **que les défauts connus ont été reproduits**, et non que l’inclusion float est garantie. Une correction qui couvre une valeur fait échouer ce mode : il faudra alors transférer le témoin corrigé dans la suite exigeant l’inclusion. Un témoin invalide ou une erreur de paramètres reste une erreur, même dans le mode des défauts connus.
+Le mode `--expect-known-gaps` a été retiré. Un résultat exclu fait échouer la suite.
+[float_bounds_tests.cpp](tests/float_bounds_tests.cpp) ajoute des tests de seuils,
+des conversions mixtes, le pont affine, des échantillons binaires couvrant tous
+les exposants binary32, seize fonctions unaires et 4000 contractions FMA.
+Son oracle facultatif vérifie à la fois les références réelles dirigées à 256 bits
+et les résultats binary32 à 24 bits, avec sous-normaux et débordements émulés.
+L’émulation suit la [documentation MPFR](https://www.mpfr.org/mpfr-current/mpfr.html#Exception-Related-Functions).
 
 # Ce que ces tests établissent
 
@@ -235,4 +244,55 @@ L’absence de conservation est démontrée par des valeurs numériques exclues,
 
 Les causes sont distinctes : conservation d’une borne entière non représentable alors que l’opération est flottante, contraction autorisée non couverte par les arrondis séparés, et réduction trigonométrique dont l’arrondi intermédiaire n’est pas encadré. Le diagnostic optionnel ajoute un défaut de conversion dans les métadonnées de précision. Les tests de régression float précédents pouvaient passer tout en laissant ces défauts présents.
 
-Les corrections devront faire passer les assertions d’inclusion ordinaires. Le passage de ces six témoins sera une condition nécessaire ; une garantie générale exigera encore des règles conservatrices pour toutes les opérations et un contrat couvrant les exécutions analysées.
+Les corrections font maintenant passer les assertions d’inclusion ordinaires. Ce passage était une condition nécessaire ; les tests finis ne constituent pas à eux seuls une preuve pour toute expression Faust ou toute cible.
+
+# État après correction
+
+| Test | Intervalle corrigé | Valeur incluse |
+|---|---|---:|
+| `addition` | `[16777216, 16777218]` | `16777216` |
+| `multiplication` | `[16785408, 16793604]` | `16785408` |
+| `delay` | `[-1, 8195]` | `−1` |
+| `conversion` | `[16777216, 16777216]` | `16777216` |
+| `contraction` | `[-4, 0]` | `−1` |
+| `sine` | `[-0.50636577606201172, -0.50636547803878784]` | `-0.50636565685272217` |
+| `sine-large` | `[-1, 1]` | `0.65657669305801392` |
+
+Le noyau conservateur double s’applique maintenant aussi au mode float. Si une
+opération fournit une borne basse certifiée `l` et une borne haute certifiée `h`,
+on construit `[RD32(l), RU32(h)]`. La première borne est au plus égale à `l`,
+la seconde au moins égale à `h`. Le calcul de référence et sa réduction au
+format cible sont ainsi conservateurs, y compris pour un résultat ponctuel,
+un sous-normal, un débordement ou une valeur flottante d’apparence entière.
+
+Cet encadrement contient le résultat réel et son arrondi binary32. La composition
+couvre aussi une contraction FMA, car le produit exact reste dans son intervalle
+intermédiaire. Le contrat autorise cette contraction mais interdit la réassociation
+et suppose un sous-dépassement graduel, sans FTZ/DAZ. Les entrées doivent respecter
+leurs domaines, et les conversions exécutées doivent être définies.
+
+Les constantes ont une voie explicite : `FloatNum` arrondit une fois un littéral
+connu, puis conserve son point. Un résultat plié par Faust doit arriver par cette
+voie. Une opération sur des domaines ponctuels n’est pas automatiquement une
+constante pliée. `FloatCast` décrit pour sa part une conversion monotone connue.
+Les opérations mixtes convertissent l’entier en float avant leur calcul ; les
+résultats flottants, même nuls ou entiers, conservent leur nature flottante.
+
+La référence mathématique `*Bounds` est indépendante de la libm hôte. Pour inclure
+les résultats d’une **libm cible approximative**, la marge actuelle
+correspond exactement à deux pas représentables autour des bornes. La cible
+doit respecter ce contrat, avec les valeurs spéciales exactes et les plages de
+sortie utilisées. Une erreur absolue annoncée en ULPs doit être traduite dans
+ce contrat : près d’un changement de binade, deux ULPs ne sont pas nécessairement
+deux voisins représentables. Ces tests ne certifient pas une libm arbitraire.
+Le grand sinus utilise un intervalle volontairement large, plutôt qu’une phase
+approximative non justifiée.
+
+Le pont affine utilise l’oracle ordinaire sur tout l’horizon pour les opérations
+flottantes : on perd la précision des taux, mais on évite de supposer qu’une
+fonction arrondie en escalier reste entre les cordes de ses extrémités. La preuve
+d’un invariant de récurrence demeure une obligation distincte.
+
+Les suites ont été vérifiées avec Apple Clang 21, GCC 15 et MPFR, avec UBSan,
+et en WebAssembly sous Emscripten 3.1.74 et Node. Aucune dépendance MPFR/GMP
+n’a été ajoutée à la bibliothèque ni à la construction WebAssembly.

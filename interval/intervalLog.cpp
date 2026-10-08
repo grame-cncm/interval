@@ -32,12 +32,12 @@ static const interval domain{0, HUGE_VAL, 0};
 // Public API: uncompensated natural-log bounds over x intersected with [0, +inf].
 // An empty domain yields empty; a zero-only domain yields the -inf point with
 // default floating LSB, since a finite precision cannot be inferred there.
-// Public API: numeric log image on its valid domain. In double precision,
-// the native kernel encloses endpoints and extrema; other precisions retain
+// Public API: numeric log image on its valid domain. In float/double,
+// the native kernel encloses endpoints and extrema; quad/fixed retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::LogBounds(const interval& x) const
 {
-    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Log, x);
+    if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Log, x);
     interval i = intersection(x, domain);
 
     if (i.isEmpty()) {

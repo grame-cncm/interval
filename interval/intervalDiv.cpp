@@ -25,8 +25,8 @@ namespace itv {
 //------------------------------------------------------------------------------------------
 // Interval division
 
-// Public API: enclose floating division with directly divided endpoints. Double
-// bounds round outward; other precisions retain their previous evaluation.
+// Public API: enclose floating division with directly divided endpoints. Float/double
+// bounds round outward; quad/fixed retain their previous evaluation.
 // Empty operands yield empty; zero or an indeterminate infinite corner gives
 // [-inf, +inf]. The LSB estimate remains separate from numeric bound inclusion.
 interval interval_algebra::Div(const interval& x, const interval& y) const
@@ -38,10 +38,11 @@ interval interval_algebra::Div(const interval& x, const interval& y) const
         return {-HUGE_VAL, HUGE_VAL, std::min({x.lsb(), y.lsb(), -24})};
     }
 
-    if (programPrecision() == 2) {
+    if (detail::usesNativeBounds()) {
+        const interval xFloat = detail::floatingOperand(x), yFloat = detail::floatingOperand(y);
         double lo = HUGE_VAL, hi = -HUGE_VAL;
-        for (double numerator : {x.lo(), x.hi()}) {
-            for (double denominator : {y.lo(), y.hi()}) {
+        for (double numerator : {xFloat.lo(), xFloat.hi()}) {
+            for (double denominator : {yFloat.lo(), yFloat.hi()}) {
                 const double a = detail::directedBinary(detail::BinaryOp::Div, numerator,
                                                        denominator, detail::Direction::Down);
                 const double b = detail::directedBinary(detail::BinaryOp::Div, numerator,

@@ -29,12 +29,12 @@ namespace itv {
 
 static const interval domain(1, HUGE_VAL);
 
-// Public API: numeric acosh image on its valid domain. In double precision,
-// the native kernel encloses endpoints and extrema; other precisions retain
+// Public API: numeric acosh image on its valid domain. In float/double,
+// the native kernel encloses endpoints and extrema; quad/fixed retain
 // their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::AcoshBounds(const interval& x) const
 {
-    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Acosh, x);
+    if (detail::usesNativeBounds()) return detail::doubleUnaryBounds(detail::UnaryOp::Acosh, x);
     interval i = intersection(domain, x);
     if (i.isEmpty()) {
         return empty();

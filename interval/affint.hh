@@ -46,12 +46,12 @@ struct AffItv {
 
     bool   isEmpty() const { return std::isnan(a0) || std::isnan(b0); }
     bool   isConst() const { return a1 == 0 && b1 == 0; }
-    // Public API: enclose evaluation of the lower/upper affine line. In double
+    // Public API: enclose evaluation of the lower/upper affine line. In float/double
     // mode both product and sum round outward; t=0 avoids an inf*0 corner.
     double lo(double t) const
     {
         if (a1 == 0 || t == 0) return a0;
-        if (programPrecision() != 2) return a0 + a1 * t;
+        if (!detail::usesNativeBounds()) return a0 + a1 * t;
         const double result = detail::directedBinary(detail::BinaryOp::Add, a0,
             detail::directedBinary(detail::BinaryOp::Mul, a1, t, detail::Direction::Down),
             detail::Direction::Down);
@@ -62,7 +62,7 @@ struct AffItv {
     double hi(double t) const
     {
         if (b1 == 0 || t == 0) return b0;
-        if (programPrecision() != 2) return b0 + b1 * t;
+        if (!detail::usesNativeBounds()) return b0 + b1 * t;
         const double result = detail::directedBinary(detail::BinaryOp::Add, b0,
             detail::directedBinary(detail::BinaryOp::Mul, b1, t, detail::Direction::Up),
             detail::Direction::Up);
@@ -101,13 +101,13 @@ inline interval toItv(const AffItv& x, double T)
 }
 
 /// Public API: prove x ⊑ y over [0,T], T>=0, by comparing exact affine lines at
-/// both endpoints. In double mode an upward enclosure of each difference must
+/// both endpoints. In float/double mode an upward enclosure of each difference must
 /// be nonpositive; comparing two separately rounded values could give a false proof.
 inline bool aleq(const AffItv& x, const AffItv& y, double T)
 {
     if (x.isEmpty()) return true;
     if (y.isEmpty()) return false;
-    if (programPrecision() == 2) {
+    if (detail::usesNativeBounds()) {
         auto leq = [](double a0, double a1, double b0, double b1, double t) {
             if (a0 == b0 && a1 == b1) return true;
             double difference = detail::directedBinary(detail::BinaryOp::Sub, a0, b0,
@@ -129,7 +129,7 @@ inline bool aleq(const AffItv& x, const AffItv& y, double T)
 }
 
 /// Public API: write a lower chord (upper when upper=true) over [0,T], T>=0.
-/// Directed subtraction and division enclose the slope in double mode. A zero
+/// Directed subtraction and division enclose the slope in float/double mode. A zero
 /// horizon or nonfinite endpoints use a constant hull in the requested direction.
 inline void achord(double v0, double vT, double T, double& c0, double& c1, bool upper = false)
 {
@@ -139,7 +139,7 @@ inline void achord(double v0, double vT, double T, double& c0, double& c1, bool 
         return;
     }
     c0 = v0;
-    if (programPrecision() == 2) {
+    if (detail::usesNativeBounds()) {
         const auto direction = upper ? detail::Direction::Up : detail::Direction::Down;
         c1 = detail::directedBinary(detail::BinaryOp::Div,
             detail::directedBinary(detail::BinaryOp::Sub, vT, v0, direction), T, direction);

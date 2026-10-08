@@ -41,7 +41,7 @@ static double specialmultint(double a, double b)
     return ((a == 0.0) || (b == 0.0)) ? 0.0 : (int)a * (int)b;
 }
 
-// Public API: enclose multiplication; double floating corners round outward.
+// Public API: enclose multiplication; float/double floating corners round outward.
 // Zero times an unbounded endpoint keeps the historical numeric-hull convention;
 // possible NaN values are not represented separately by this interval type.
 interval interval_algebra::Mul(const interval& x, const interval& y) const
@@ -87,11 +87,12 @@ interval interval_algebra::Mul(const interval& x, const interval& y) const
         return {min4(aint, bint, cint, dint), max4(aint, bint, cint, dint), x.lsb() + y.lsb()};*/
     }
 
-    if (programPrecision() == 2 && !integerOperands) {
+    if (detail::usesNativeBounds() && !integerOperands) {
+        const interval xFloat = detail::floatingOperand(x), yFloat = detail::floatingOperand(y);
         lo = HUGE_VAL;
         hi = -HUGE_VAL;
-        for (double u : {x.lo(), x.hi()}) {
-            for (double v : {y.lo(), y.hi()}) {
+        for (double u : {xFloat.lo(), xFloat.hi()}) {
+            for (double v : {yFloat.lo(), yFloat.hi()}) {
                 // 0*inf describes a zero endpoint limit in the numeric hull.
                 const double lower = (u == 0 || v == 0) ? 0 : detail::directedBinary(
                     detail::BinaryOp::Mul, u, v, detail::Direction::Down);
@@ -104,7 +105,8 @@ interval interval_algebra::Mul(const interval& x, const interval& y) const
     }
     return {
         lo, hi,
-        detail::sumLSB(x.lsb(), y.lsb())};  // keep both operand grids without metadata overflow
+        integerOperands ? detail::sumLSB(x.lsb(), y.lsb())
+                        : detail::floatingLSB(detail::sumLSB(x.lsb(), y.lsb()))};
 }
 
 void interval_algebra::testMul()
