@@ -19,18 +19,19 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 namespace itv {
 
 //------------------------------------------------------------------------------------------
-// The functions of the libm. Their bounds are computed by the libm of the machine that
-// computes the intervals ; the program calls the libm of its target. Neither is
-// guaranteed correctly rounded (IEEE 754 requires it of +, -, *, /, sqrt only) : the
-// bounds widen by 2 ulps of the program's precision (libmBounds), within the image of
-// the function, unless the user declares correctly rounded libms (libmCompensation).
+// Public numeric functions: *Bounds computes the reference image (directed MPFR
+// in double mode); libmBounds then adds the historical two-ULP target margin.
+// This empirical margin does not certify an arbitrary target libm. A caller can
+// inspect the reference through *Bounds independently of libmCompensation.
 //------------------------------------------------------------------------------------------
 interval interval_algebra::Acos(const interval& x) const
 {
-    return libmBounds(AcosBounds(x), 0, M_PI);
+    return libmBounds(AcosBounds(x), 0, programPrecision() == 2
+        ? detail::directedPi(detail::Direction::Up) : M_PI);
 }
 interval interval_algebra::Acosh(const interval& x) const
 {

@@ -22,6 +22,7 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
@@ -53,6 +54,12 @@ static bool integerPowerMayWrap(const interval& x, int exponent)
     // Conservatively consider 2^31 a possible wrap. The exceptional value
     // INT32_MIN for an odd power of a negative singleton is deliberately not
     // special-cased here: returning the full range remains sound.
+    if (programPrecision() == 2) {
+        // Round the magnitude upward before comparing with the wrap threshold;
+        // an approximate logarithm must not turn a possible wrap into a proof.
+        return detail::directedBinary(detail::BinaryOp::Pow, magnitude, exponent,
+                                      detail::Direction::Up) >= 2147483648.0;
+    }
     return static_cast<double>(exponent) * std::log2(magnitude) >= 31.0;
 }
 
@@ -93,11 +100,22 @@ static interval ipow(const interval& x, int k)
 
         // Round only once. Truncating log2(|v|) before combining the terms can
         // make the result one or more bits too coarse when |v| < 1.
-        precision = static_cast<int>(std::floor(logMagnitude + logDelta));
+        const double estimate = std::floor(logMagnitude + logDelta);
+        // A huge exponent or a subnormal base can put this metadata estimate
+        // outside int. Preserve a conservative grid fallback without an UB cast.
+        if (std::isfinite(estimate) && estimate > INT_MIN && estimate <= INT_MAX)
+            precision = static_cast<int>(estimate);
     }
 
     if ((k & 1) == 0) {
         // k is even
+        if (programPrecision() == 2) {
+            return {x.hasZero() ? 0 : std::min(
+                        detail::directedBinary(detail::BinaryOp::Pow, x.lo(), k, detail::Direction::Down),
+                        detail::directedBinary(detail::BinaryOp::Pow, x.hi(), k, detail::Direction::Down)),
+                    std::max(detail::directedBinary(detail::BinaryOp::Pow, x.lo(), k, detail::Direction::Up),
+                             detail::directedBinary(detail::BinaryOp::Pow, x.hi(), k, detail::Direction::Up)), precision};
+        }
         double z0 = std::pow(x.lo(), k);
         double z1 = std::pow(x.hi(), k);
         return {
@@ -109,6 +127,10 @@ static interval ipow(const interval& x, int k)
     }
 
     // k is odd
+    if (programPrecision() == 2) {
+        return {detail::directedBinary(detail::BinaryOp::Pow, x.lo(), k, detail::Direction::Down),
+                detail::directedBinary(detail::BinaryOp::Pow, x.hi(), k, detail::Direction::Up), precision};
+    }
     return {std::pow(x.lo(), k), std::pow(x.hi(), k), precision};
 }
 
@@ -160,14 +182,25 @@ interval interval_algebra::iPow(const interval& x, const interval& y) const
     return z;
 }
 
+// Public API: numeric power image. Double floating powers round outward; negative
+// bases use integer exponents by parity. The existing nonnegative integer-power
+// path retains wrapping and LSB estimates. NaN is not tracked separately.
 interval interval_algebra::PowBounds(const interval& x, const interval& y) const
 {
     if (x.isEmpty() || y.isEmpty()) {
         return empty();
     }
 
-    if ((x.lsb() >= 0) && (y.lsb() >= 0)) {
+    if (detail::hasInt32Bounds(x) && detail::hasInt32Bounds(y)) {
         return iPow(x, y);
+    }
+
+    if (programPrecision() == 2) {
+        // Preserve the established grid estimate for bounded integer exponents;
+        // their endpoint powers are now themselves evaluated with directed MPFR.
+        if (y.lsb() >= 0 && y.lo() >= 0 && y.hi() <= INT32_MAX &&
+            std::isfinite(x.lo()) && std::isfinite(x.hi())) return iPow(x, y);
+        return detail::doublePowBounds(x, y);
     }
 
     interval z  = empty();

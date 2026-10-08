@@ -49,40 +49,73 @@ range:
   nonzero divisor magnitude. The float path models `fmod`, whose bound closes at
   `|y|`.
 
-- **Floating-point operations** follow two settings of the user:
-  - `itv::programPrecision()`, the precision of the program: 2 double by default,
-    1 single, 3 quad, 4 fixed point. The Faust compiler declares it from `-single`,
-    `-double`, `-quad`. In single precision, every bound of a float-carried interval
-    (`lsb < 0`) is rounded to the nearest float when the interval is built
-    (`programBound`). Round to nearest is monotone, and for `+`, `-`, `*`, `/` and
-    `sqrt` of floats the double rounding is innocuous (53 >= 2×24 + 2: rounding in
-    double, then in float, gives the float the program computes, even when the double
-    result is not exact): an elementary operation gives the very bound the program
-    computes, and a constant stays a point (`0.1 + 0.2` is the float `0.3f`). Not
-    rounded: the integer bounds beyond 2^24 (an integer value may carry a float
-    precision by default). Subnormal bounds are rounded too, including underflow
-    to zero; `pow` uses nonzero domain separators representable at the program's
-    precision.
-  - `itv::libmCompensation()`, true by default. IEEE 754 requires a correct rounding
-    of `+`, `-`, `*`, `/` and `sqrt` only: the functions of the libm (`sin`, `cos`,
-    `tan`, the inverse and hyperbolic functions, `exp`, `log`, `log10`, `pow`) may be
-    off by an ulp (macOS: `sinf(1.00000596f)` is one ulp above `(float)sin(1.00000596)`),
-    and the program calls the libm of its target, not the libm of the machine that
-    computes the intervals. Their bounds widen by 2 ulps of the program's precision
-    (`libmBounds`), within the image of the function (`sin` stays in `[-1, 1]`, `exp`
-    stays `>= 0`), never for a point (a function of a constant is folded at compile
-    time), an exact 0 (the C standard makes the libm exact there, annex F) or an
-    integer result. Turn it off only when both libms are correctly rounded (CORE-MATH
-    for instance): the libm of the target and the libm of the machine that computes the
-    intervals.
+- **Floating-point operations** use `itv::programPrecision()`: 2 double by default,
+  1 single, 3 quad, 4 fixed point. Double mode uses the directed reference
+  calculations described below. The other modes retain their existing rules:
+  notably, single-precision bounds are converted to the nearest float when an
+  interval is constructed, including subnormal rounding and underflow to zero.
+  Those rules are not yet a general conservative analysis of float programs.
+- **Target-libm compensation** uses `itv::libmCompensation()`, enabled by default.
+  The historical margin is two ULPs of the program precision, clipped to known
+  function images. It is an assumption, not a universal bound for arbitrary
+  libms. In double mode, the reference calculation uses MPFR even when this
+  compensation is disabled; computed singletons no longer bypass the margin.
+  The other modes retain their previous singleton exemption and host-libm
+  evaluation, which need a separate audit.
 
-  Not covered by the bounds: the FMA contraction and the reassociation of the C++
-  compiler. The decisions that read the intervals keep a margin for those: the
-  compiler keeps the guard of a table access whose index is within 4 ulps of an edge.
-  The rules that reason on reals (the hull of a convex combination, where
-  `(1 - t)*m + t*m` is `100.0` in float for `m = 99.9999924`) add
-  `ulpMargin(lo, hi, k)`, k ulps of the program's precision at the magnitude of the
-  bounds.
+Compiler reassociation, target approximations and recurrence invariants require
+an explicit execution contract. A local bound calculation alone cannot certify
+all of those properties. The reference arithmetic is kept separate from these
+remaining obligations.
+
+## Conservative binary64 bound calculations
+
+With `itv::programPrecision() == 2`, numerical bounds are evaluated with MPFR in
+the required direction and converted to binary64 in the same direction. This
+covers the analyzer's own rounding error: if the desired lower bound belongs to
+`[L-, L+]` and the upper bound to `[U-, U+]`, the retained interval is `[L-, U+]`.
+It is not enough to widen only the final result after intermediate calculations
+have already rounded inward. See [MPFR's rounding contract](https://www.mpfr.org/mpfr-current/mpfr.html#Rounding).
+
+The directed kernel covers floating addition, subtraction, multiplication,
+division, reciprocal, square root, powers, and the reference images exposed by
+the `*Bounds` mathematical functions. Trigonometric extrema and tangent poles
+are located using enclosing values of pi rather than host-libm argument
+reduction. `fmod` avoids approximate quotient-to-int conversion; `remainder`
+rounds half-divisor bounds outward. Affine coefficient arithmetic, line
+evaluation, chords, shifts, and inclusion comparisons use the same kernel.
+Integer operations retain their int32 wrapping contract.
+
+An injected literal is already a known machine value: `FloatNum(0.1)` remains a
+singleton. `FloatNum` also preserves the floating nature of integral-looking
+literals, so `FloatNum(65536) * FloatNum(65536)` does not take the int32 path.
+An exact operation such as `0.5 * 0.25` remains a singleton too. An inexact
+operation such as `1 + 2^-54` is enclosed by `[1, nextafter(1, +inf)]`; a rounded
+equality of endpoints must not create a false constant.
+
+This is the first step towards a reliable computational analysis. It does not
+certify arbitrary target libms or reassociation, add separate NaN/signed-zero
+tracking, prove recurrence invariants, or certify the LSB precision estimates.
+Those obligations need separate verification before bounds justify safety decisions. The
+single/quad/fixed paths retain their previous rules and need their own audit.
+The MPFR path is a reference implementation; its performance is not yet measured.
+
+## Build dependencies
+
+MPFR and GMP development files are required. Install `libmpfr-dev libgmp-dev` on
+Debian/Ubuntu, `mpfr` through Homebrew or MacPorts on macOS, or `mpfr:x64-windows`
+through vcpkg on Windows. Configure with `CMAKE_PREFIX_PATH` when the installation
+is outside the normal search paths; Windows builds use the vcpkg CMake toolchain.
+MPFR/GMP retain their own licenses when linked with this Apache-licensed project.
+
+The CMake target disables fast-math and implicit contraction for the analyzer
+and its header-based helpers. Direct consumers must preserve this compilation
+contract as well. The kernel does not change the CPU rounding mode or the
+caller's MPFR exponent range. If that range cannot represent binary64 inputs,
+the kernel returns unrestricted numeric bounds instead of loading them inexactly.
+Host comparisons and interval construction require IEEE gradual underflow
+(FTZ/DAZ disabled in the analyzer); target FTZ/DAZ remains a separate model.
+Concurrent calls require a thread-safe MPFR build or caller serialization.
 
 ## Special intervals
 

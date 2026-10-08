@@ -20,6 +20,7 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
@@ -27,8 +28,12 @@ namespace itv {
 // interval Tanh(const interval& x);
 // void testTanh();
 
+// Public API: numeric tanh image on its valid domain. In double precision,
+// MPFR encloses endpoint values and interior extrema; other precisions retain
+// their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::TanhBounds(const interval& x) const
 {
+    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Tanh, x);
     if (x.isEmpty()) {
         return empty();
     }

@@ -19,8 +19,14 @@ namespace itv {
 //------------------------------------------------------------------------------------------
 // Interval IntNum
 
+// Public API: inject the known binary64 literal as a point. In double mode retain
+// floating nature even for integral-looking literals; other modes keep legacy
+// injection. A known literal needs no widening for analyzer rounding error.
+// NaN keeps the library's historical empty representation.
 interval interval_algebra::FloatNum(double x) const
 {
-    return singleton(x);
+    const interval value = singleton(x);
+    if (programPrecision() != 2) return value;
+    return {value.lo(), value.hi(), std::min(value.lsb(), -1)};
 }
 }  // namespace itv

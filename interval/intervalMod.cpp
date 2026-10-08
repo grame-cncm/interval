@@ -22,6 +22,7 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 
@@ -131,6 +132,9 @@ interval positiveFMod(const interval& x, const interval& y)
 }
 
 // fmod of two signed intervals
+// Public API: integer C modulo for integer operands, otherwise numeric fmod.
+// Double floating bounds avoid rounded quotient tests and unsafe int casts;
+// invalid-only domains yield empty and NaN is not represented separately.
 interval interval_algebra::Mod(const interval& x, const interval& y) const
 {
     if (x.isEmpty() || y.isEmpty()) {
@@ -141,7 +145,7 @@ interval interval_algebra::Mod(const interval& x, const interval& y) const
     // bounded by BOTH |x| and the largest divisor magnitude minus one. The float path
     // below, correct for fmod, closes the bound at |y| -- one whole unit too wide for
     // integers : int(sr) % 2 is [0, 1], not [0, 2].
-    if ((x.lsb() >= 0) && (y.lsb() >= 0)) {
+    if (detail::hasInt32Bounds(x) && detail::hasInt32Bounds(y)) {
         const double m = std::max(std::fabs(y.lo()), std::fabs(y.hi()));
         if (m == 0) {
             return empty();  // y == [0, 0] : division by zero, no value to describe
@@ -155,6 +159,8 @@ interval interval_algebra::Mod(const interval& x, const interval& y) const
         const double hi = (x.hi() <= 0) ? 0.0 : std::min(x.hi(), m - 1);
         return {lo, hi, std::min(x.lsb(), y.lsb())};
     }
+
+    if (programPrecision() == 2) return detail::doubleFmodBounds(x, y);
 
     auto [xn, xp] = split(x);    // slipts x into a negative and a positive interval
     auto [yn, yp] = splitnz(y);  // slipts y into a negative and a positive interval (zero excluded)
@@ -178,8 +184,11 @@ interval interval_algebra::Mod(const interval& x, const interval& y) const
 // fmod carries the modulo semantics this file already computes : the two differ by
 // their NATURE (fmod is real whatever its operands, `%` on integers is an integer),
 // which is not an interval's business.
+// Public API: floating modulo; in double precision, even integer-looking inputs
+// follow fmod rather than C integer modulo. NaN is not tracked separately.
 interval interval_algebra::Fmod(const interval& x, const interval& y) const
 {
+    if (programPrecision() == 2) return detail::doubleFmodBounds(x, y);
     return Mod(x, y);
 }
 

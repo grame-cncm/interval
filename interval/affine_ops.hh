@@ -132,15 +132,40 @@ class AffineOps : public Base {
     AffItv Control(const AffItv& x, const AffItv&) const override { return x; }
 
     //--- the affine-preserving (linear) regime ----------------------------------------
+    // Public API: coefficient-wise enclosure of x+y over a nonnegative horizon.
+    // Double coefficients round down on the lower line and up on the upper line.
     AffItv Add(const AffItv& x, const AffItv& y) const override
     {
         if (x.isEmpty() || y.isEmpty()) return aempty();
+        if (programPrecision() == 2) {
+            const AffItv result{detail::directedBinary(detail::BinaryOp::Add, x.a0, y.a0, detail::Direction::Down),
+                    detail::directedBinary(detail::BinaryOp::Add, x.a1, y.a1, detail::Direction::Down),
+                    detail::directedBinary(detail::BinaryOp::Add, x.b0, y.b0, detail::Direction::Up),
+                    detail::directedBinary(detail::BinaryOp::Add, x.b1, y.b1, detail::Direction::Up),
+                    std::min(x.lsb, y.lsb)};
+            // Indeterminate coefficients must not erase numeric execution paths.
+            if (result.isEmpty() || std::isnan(result.a1) || std::isnan(result.b1))
+                return fromItv(interval(-HUGE_VAL, HUGE_VAL));
+            return result;
+        }
         return {x.a0 + y.a0, x.a1 + y.a1, x.b0 + y.b0, x.b1 + y.b1,
                 std::min(x.lsb, y.lsb)};
     }
+    // Public API: coefficient-wise enclosure of x-y over a nonnegative horizon.
+    // Double coefficients round down on the lower line and up on the upper line.
     AffItv Sub(const AffItv& x, const AffItv& y) const override
     {
         if (x.isEmpty() || y.isEmpty()) return aempty();
+        if (programPrecision() == 2) {
+            const AffItv result{detail::directedBinary(detail::BinaryOp::Sub, x.a0, y.b0, detail::Direction::Down),
+                    detail::directedBinary(detail::BinaryOp::Sub, x.a1, y.b1, detail::Direction::Down),
+                    detail::directedBinary(detail::BinaryOp::Sub, x.b0, y.a0, detail::Direction::Up),
+                    detail::directedBinary(detail::BinaryOp::Sub, x.b1, y.a1, detail::Direction::Up),
+                    std::min(x.lsb, y.lsb)};
+            if (result.isEmpty() || std::isnan(result.a1) || std::isnan(result.b1))
+                return fromItv(interval(-HUGE_VAL, HUGE_VAL));
+            return result;
+        }
         return {x.a0 - y.b0, x.a1 - y.b1, x.b0 - y.a0, x.b1 - y.a1,
                 std::min(x.lsb, y.lsb)};
     }
@@ -188,12 +213,18 @@ class AffineOps : public Base {
     }
 
     //--- casts ------------------------------------------------------------------------
+    // Public API: enclose integer truncation; constant corridors use the ordinary
+    // rule, moving corridors add one unit of outward slack. A later hull caps
+    // integer claims at int32 limits; this does not define an invalid runtime cast.
     AffItv IntCast(const AffItv& x) const override
     {
         if (x.isEmpty()) return aempty();
         if (x.isConst()) return fromItv(fItv.IntCast(toItv(x, fT)));
         // truncation keeps affinity with one unit of slack, and marks the chain integer
-        return {x.a0 - 1, x.a1, x.b0 + 1, x.b1, 0};
+        return {programPrecision() == 2 ? detail::directedBinary(
+                    detail::BinaryOp::Sub, x.a0, 1, detail::Direction::Down) : x.a0 - 1,
+                x.a1, programPrecision() == 2 ? detail::directedBinary(
+                    detail::BinaryOp::Add, x.b0, 1, detail::Direction::Up) : x.b0 + 1, x.b1, 0};
     }
     AffItv BitCast(const AffItv& x) const override { return x; }
     AffItv FloatCast(const AffItv& x) const override
@@ -490,7 +521,7 @@ class AffineOps : public Base {
         if (r0.isEmpty() || rT.isEmpty()) return aempty();
         AffItv r;
         achord(r0.lo(), rT.lo(), fT, r.a0, r.a1);
-        achord(r0.hi(), rT.hi(), fT, r.b0, r.b1);
+        achord(r0.hi(), rT.hi(), fT, r.b0, r.b1, true);
         r.lsb = std::min(r0.lsb(), rT.lsb());
         return r;
     }
@@ -504,17 +535,23 @@ class AffineOps : public Base {
         if (x.isEmpty()) return fromItv(interval(0, 0));
         AffItv r = x;
         if (r.b1 >= 0) {
-            r.b0 -= r.b1 * nlo;
+            // Subtraction reverses the product's bound direction.
+            r.b0 = programPrecision() == 2 ? detail::directedBinary(detail::BinaryOp::Sub, r.b0,
+                detail::directedBinary(detail::BinaryOp::Mul, r.b1, nlo, detail::Direction::Down),
+                detail::Direction::Up) : r.b0 - r.b1 * nlo;
         } else {
             r.b0 = std::max(x.hi(0), x.hi(fT));
             r.b1 = 0;
         }
         if (r.a1 <= 0) {
-            r.a0 -= r.a1 * nlo;
+            r.a0 = programPrecision() == 2 ? detail::directedBinary(detail::BinaryOp::Sub, r.a0,
+                detail::directedBinary(detail::BinaryOp::Mul, r.a1, nlo, detail::Direction::Up),
+                detail::Direction::Down) : r.a0 - r.a1 * nlo;
         } else {
             r.a0 = std::min(x.lo(0), x.lo(fT));
             r.a1 = 0;
         }
+        if (r.isEmpty()) return fromItv(interval(-HUGE_VAL, HUGE_VAL));
         return ajoin(r, fromItv(interval(0, 0)), fT);
     }
 };

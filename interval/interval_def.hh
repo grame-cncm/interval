@@ -23,7 +23,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
 #include <iostream>
+#include <limits>
 #include <string>
 
 // #include "global"
@@ -48,12 +50,10 @@ inline int& programPrecision()
 }
 
 /**
- * The compensation of the libm (true by default) : the functions of the libm (sin, exp,
- * log, pow...) are not guaranteed correctly rounded, and the program calls the libm of
- * its target, not the one that computes the intervals. Their bounds widen by 2 ulps of
- * the program's precision (libmBounds). A user may turn it off when both libms are
- * correctly rounded (CORE-MATH for instance) : the libm of the target, and the libm of
- * the machine that computes the intervals.
+ * Public API: legacy target-libm compensation, enabled by default. The two-ULP
+ * widening is a configurable assumption, not a universal error guarantee.
+ * Double reference bounds use MPFR independently of this setting; other modes
+ * still use the host libm. Disable only under an established target/host contract.
  */
 inline bool& libmCompensation()
 {
@@ -62,6 +62,8 @@ inline bool& libmCompensation()
 }
 
 /**
+ * Public API: legacy conversion of a bound to the program precision. Double bounds
+ * are unchanged; conservative double operations round before construction.
  * A bound of a float-carried value, at the precision of the program. Round to nearest
  * is monotone : for a monotone operation, the bound computed in double then rounded
  * to float is the value the program computes at that bound. For +, -, *, / and sqrt
@@ -151,6 +153,13 @@ class interval {
 
     explicit interval(double x) noexcept
     {
+        // Exceptional points have no finite grid exponent. Avoid precision
+        // inference on NaN/inf; NaN retains the historical empty convention.
+        if (!std::isfinite(x)) {
+            fLo = x;
+            fHi = x;
+            return;
+        }
         if (x == 0) {
             fLo  = 0;
             fHi  = 0;
@@ -313,6 +322,7 @@ inline interval reunion(const interval& i, const interval& j)
 
 inline interval singleton(double x)
 {
+    if (!std::isfinite(x)) return {x, x, -24};
     if (x == 0) {
         return {0, 0, 0};
     }
@@ -377,8 +387,9 @@ inline bool operator>(const interval& i, const interval& j)
 /**
  * The bounds of a libm function, compensated : 2 ulps of the program's precision
  * outward, within the image [fmin, fmax] of the function (sin stays in [-1, 1], exp
- * stays >= 0), a bound of exactly 0 excepted. A point is left as it is : a function of
- * a constant is folded by the compiler and never calls the libm of the target.
+ * stays >= 0), a bound of exactly 0 excepted. In double mode a singleton is not
+ * automatically a folded constant, so it receives the target margin too. Other
+ * modes retain the historical singleton exemption. This margin is heuristic.
  */
 inline double ulpStep(double b, double dir)
 {
@@ -390,8 +401,11 @@ inline double ulpStep(double b, double dir)
 
 inline interval libmBounds(const interval& r, double fmin, double fmax)
 {
-    // an integer result (lsb >= 0) is computed in integers, never by the libm
-    if (!libmCompensation() || r.isEmpty() || r.isconst() || r.lsb() >= 0) return r;
+    // A singleton alone is not evidence that Faust folded an operation. Double
+    // references are certified independently; the legacy two-ULP target margin
+    // still applies to singleton results unless they are explicitly integer.
+    if (!libmCompensation() || r.isEmpty() || r.lsb() >= 0 ||
+        (programPrecision() != 2 && r.isconst())) return r;
     // a bound of exactly 0 stays : the C standard (annex F) makes the libm exact there
     // (sin(+-0) = +-0, tan(0) = 0, log(1) = 0, pow(0, y) = 0...), and a bound of 0 comes
     // from such an exact point

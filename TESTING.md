@@ -2,12 +2,18 @@ These notes on testing the intervals results are destined to future library cont
 
 # Test suites
 
-The project has two complementary executables:
+The project has three complementary executables:
 
 - `IntervalTests` contains fast, deterministic regression tests. It checks interval bounds and
   LSB values strictly and is the suite executed by CTest and CI.
 - `TestInterval` is an experimental numerical-analysis program. It can run large sampled studies
   of interval operations and is not part of the default CTest suite.
+- `DirectedBoundsTests` checks conservative double bounds against a 256-bit MPFR
+  oracle. It covers half-ULP errors, false singleton underflow, overflow, exact
+  constants, transcendental domains, periodic extrema/poles, affine interpolation,
+  and preservation of the host rounding mode. It is executed by CTest and CI.
+
+Install the MPFR and GMP development dependencies described in README.md first.
 
 Configure, build and run the regression suite with:
 

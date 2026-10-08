@@ -43,6 +43,6 @@ testinterval
 
 # cmake
 build/**
+build-directed*/
 
 todo
-

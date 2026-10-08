@@ -15,6 +15,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: install directed-rounding dependencies
+      run: sudo apt-get update && sudo apt-get install -y libmpfr-dev libgmp-dev
     - name: create cmake project
       run: cmake -B build -S .
     - name: build cmake project

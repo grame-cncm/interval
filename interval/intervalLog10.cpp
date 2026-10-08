@@ -19,6 +19,7 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
@@ -29,8 +30,12 @@ namespace itv {
 // Public API: uncompensated base-10-log bounds over x intersected with [0, +inf].
 // An empty domain yields empty; a zero-only domain yields the -inf point with
 // default floating LSB, since a finite precision cannot be inferred there.
+// Public API: numeric log10 image on its valid domain. In double precision,
+// MPFR encloses endpoint values and interior extrema; other precisions retain
+// their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::Log10Bounds(const interval& x) const
 {
+    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Log10, x);
     const interval i = intersection(interval(0, HUGE_VAL, 0), x);
     if (i.isEmpty()) {
         return empty();

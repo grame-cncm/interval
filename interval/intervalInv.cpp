@@ -19,6 +19,7 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
@@ -35,6 +36,7 @@ static double inv(double x)
 // Public API: reciprocal bounds and their LSB estimate; empty stays empty.
 // The exact zero point yields +inf with default floating LSB, preserving the
 // historical unsigned-zero convention without estimating a precision at zero.
+// Double reciprocal endpoints round outward; LSB remains an estimate.
 interval interval_algebra::Inv(const interval& x) const
 {
     if (x.isEmpty()) {
@@ -42,6 +44,18 @@ interval interval_algebra::Inv(const interval& x) const
     }
     if (x.isZero()) {
         return {HUGE_VAL, HUGE_VAL, -24};
+    }
+
+    if (programPrecision() == 2) {
+        const int lsb = std::min(x.lsb(), -24);
+        if (x.lo() < 0 && x.hi() > 0) return {-HUGE_VAL, HUGE_VAL, lsb};
+        // Zero is normalized as +0 by interval: a negative corridor ending at
+        // zero must also contain its +inf reciprocal, not only the -inf limit.
+        if (x.lo() < 0 && x.hi() == 0) return {-HUGE_VAL, HUGE_VAL, lsb};
+        return {x.hi() == 0 ? -HUGE_VAL : detail::directedBinary(
+                    detail::BinaryOp::Div, 1, x.hi(), detail::Direction::Down),
+                x.lo() == 0 ? HUGE_VAL : detail::directedBinary(
+                    detail::BinaryOp::Div, 1, x.lo(), detail::Direction::Up), lsb};
     }
 
     int    sign = signMaxValAbs(x);

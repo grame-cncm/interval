@@ -18,6 +18,7 @@
 #include <cmath>
 
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 /**
  * Affine-in-time intervals: x(t) ∈ [a0 + a1·t, b0 + b1·t] for t ∈ [0, T].
@@ -45,8 +46,28 @@ struct AffItv {
 
     bool   isEmpty() const { return std::isnan(a0) || std::isnan(b0); }
     bool   isConst() const { return a1 == 0 && b1 == 0; }
-    double lo(double t) const { return a1 == 0 ? a0 : a0 + a1 * t; }
-    double hi(double t) const { return b1 == 0 ? b0 : b0 + b1 * t; }
+    // Public API: enclose evaluation of the lower/upper affine line. In double
+    // mode both product and sum round outward; t=0 avoids an inf*0 corner.
+    double lo(double t) const
+    {
+        if (a1 == 0 || t == 0) return a0;
+        if (programPrecision() != 2) return a0 + a1 * t;
+        const double result = detail::directedBinary(detail::BinaryOp::Add, a0,
+            detail::directedBinary(detail::BinaryOp::Mul, a1, t, detail::Direction::Down),
+            detail::Direction::Down);
+        // An indeterminate extended-real expression must not remove other
+        // numeric states from a corridor used as an analysis bound.
+        return std::isnan(result) ? -HUGE_VAL : result;
+    }
+    double hi(double t) const
+    {
+        if (b1 == 0 || t == 0) return b0;
+        if (programPrecision() != 2) return b0 + b1 * t;
+        const double result = detail::directedBinary(detail::BinaryOp::Add, b0,
+            detail::directedBinary(detail::BinaryOp::Mul, b1, t, detail::Direction::Up),
+            detail::Direction::Up);
+        return std::isnan(result) ? HUGE_VAL : result;
+    }
 };
 
 /// Bottom: no values yet. Neutral in every join.
@@ -79,27 +100,52 @@ inline interval toItv(const AffItv& x, double T)
     return {lo, hi, x.lsb};
 }
 
-/// x ⊑ y over [0, T]: affine bounds compare at the endpoints.
+/// Public API: prove x ⊑ y over [0,T], T>=0, by comparing exact affine lines at
+/// both endpoints. In double mode an upward enclosure of each difference must
+/// be nonpositive; comparing two separately rounded values could give a false proof.
 inline bool aleq(const AffItv& x, const AffItv& y, double T)
 {
     if (x.isEmpty()) return true;
     if (y.isEmpty()) return false;
+    if (programPrecision() == 2) {
+        auto leq = [](double a0, double a1, double b0, double b1, double t) {
+            if (a0 == b0 && a1 == b1) return true;
+            double difference = detail::directedBinary(detail::BinaryOp::Sub, a0, b0,
+                                                       detail::Direction::Up);
+            if (t != 0) {
+                const double rate = detail::directedBinary(detail::BinaryOp::Sub, a1, b1,
+                                                           detail::Direction::Up);
+                difference = detail::directedBinary(detail::BinaryOp::Add, difference,
+                    detail::directedBinary(detail::BinaryOp::Mul, rate, t, detail::Direction::Up),
+                    detail::Direction::Up);
+            }
+            return difference <= 0;
+        };
+        return leq(y.a0, y.a1, x.a0, x.a1, 0) && leq(y.a0, y.a1, x.a0, x.a1, T) &&
+               leq(x.b0, x.b1, y.b0, y.b1, 0) && leq(x.b0, x.b1, y.b0, y.b1, T);
+    }
     return y.lo(0) <= x.lo(0) && y.lo(T) <= x.lo(T) && x.hi(0) <= y.hi(0) &&
            x.hi(T) <= y.hi(T);
 }
 
-/// Affine chord through two endpoint values; degenerates to a constant when possible.
-inline void achord(double v0, double vT, double T, double& c0, double& c1)
+/// Public API: write a lower chord (upper when upper=true) over [0,T], T>=0.
+/// Directed subtraction and division enclose the slope in double mode. A zero
+/// horizon or nonfinite endpoints use a constant hull in the requested direction.
+inline void achord(double v0, double vT, double T, double& c0, double& c1, bool upper = false)
 {
-    if (!std::isfinite(v0) || !std::isfinite(vT) || v0 == vT) {
-        c0 = (v0 == vT) ? v0 : (std::isfinite(v0) ? vT : v0);
-        if (!std::isfinite(v0)) c0 = v0;
-        if (!std::isfinite(vT)) c0 = vT;
+    if (!std::isfinite(v0) || !std::isfinite(vT) || v0 == vT || T <= 0 || !std::isfinite(T)) {
+        c0 = upper ? std::max(v0, vT) : std::min(v0, vT);
         c1 = 0;
         return;
     }
     c0 = v0;
-    c1 = (vT - v0) / T;
+    if (programPrecision() == 2) {
+        const auto direction = upper ? detail::Direction::Up : detail::Direction::Down;
+        c1 = detail::directedBinary(detail::BinaryOp::Div,
+            detail::directedBinary(detail::BinaryOp::Sub, vT, v0, direction), T, direction);
+    } else {
+        c1 = (vT - v0) / T;
+    }
 }
 
 /// Join (reunion) of two forms: endpoint hulls, chorded back to affine. Sound by
@@ -111,7 +157,7 @@ inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
     if (y.isEmpty()) return x;
     AffItv r;
     achord(std::min(x.lo(0), y.lo(0)), std::min(x.lo(T), y.lo(T)), T, r.a0, r.a1);
-    achord(std::max(x.hi(0), y.hi(0)), std::max(x.hi(T), y.hi(T)), T, r.b0, r.b1);
+    achord(std::max(x.hi(0), y.hi(0)), std::max(x.hi(T), y.hi(T)), T, r.b0, r.b1, true);
     r.lsb = std::min(x.lsb, y.lsb);
     return r;
 }

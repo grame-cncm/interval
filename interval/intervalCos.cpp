@@ -20,6 +20,7 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
@@ -32,8 +33,12 @@ static double cosPi(double x)
     return std::cos(x * M_PI);
 }
 
+// Public API: numeric cos image on its valid domain. In double precision,
+// MPFR encloses endpoint values and interior extrema; other precisions retain
+// their historical rule. LSB is an estimate; NaN is not tracked separately.
 interval interval_algebra::CosBounds(const interval& x) const
 {
+    if (programPrecision() == 2) return detail::doubleUnaryBounds(detail::UnaryOp::Cos, x);
     if (x.isEmpty()) {
         return empty();
     }

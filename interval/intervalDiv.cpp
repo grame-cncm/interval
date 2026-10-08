@@ -19,15 +19,16 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 
 namespace itv {
 //------------------------------------------------------------------------------------------
 // Interval division
 
-// Public API: enclose floating division with directly divided endpoints, using
-// the current program precision. Empty operands yield empty; a denominator
-// containing zero or an indeterminate infinite endpoint yields [-inf, +inf].
-// LSB retains the reciprocal-based estimate for finite nonzero denominators.
+// Public API: enclose floating division with directly divided endpoints. Double
+// bounds round outward; other precisions retain their previous evaluation.
+// Empty operands yield empty; zero or an indeterminate infinite corner gives
+// [-inf, +inf]. The LSB estimate remains separate from numeric bound inclusion.
 interval interval_algebra::Div(const interval& x, const interval& y) const
 {
     if (x.isEmpty() || y.isEmpty()) {
@@ -35,6 +36,22 @@ interval interval_algebra::Div(const interval& x, const interval& y) const
     }
     if (y.hasZero()) {
         return {-HUGE_VAL, HUGE_VAL, std::min({x.lsb(), y.lsb(), -24})};
+    }
+
+    if (programPrecision() == 2) {
+        double lo = HUGE_VAL, hi = -HUGE_VAL;
+        for (double numerator : {x.lo(), x.hi()}) {
+            for (double denominator : {y.lo(), y.hi()}) {
+                const double a = detail::directedBinary(detail::BinaryOp::Div, numerator,
+                                                       denominator, detail::Direction::Down);
+                const double b = detail::directedBinary(detail::BinaryOp::Div, numerator,
+                                                       denominator, detail::Direction::Up);
+                if (std::isnan(a) || std::isnan(b)) return {-HUGE_VAL, HUGE_VAL, -24};
+                lo = std::min(lo, a);
+                hi = std::max(hi, b);
+            }
+        }
+        return {lo, hi, std::min({x.lsb(), y.lsb(), -24})};
     }
 
     // Multiplication by a rounded reciprocal differs from a single division by

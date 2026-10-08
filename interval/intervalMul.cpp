@@ -19,6 +19,7 @@
 #include "check.hh"
 #include "interval_algebra.hh"
 #include "interval_def.hh"
+#include "directed_rounding.hh"
 #include "utils.hh"
 
 namespace itv {
@@ -40,6 +41,9 @@ static double specialmultint(double a, double b)
     return ((a == 0.0) || (b == 0.0)) ? 0.0 : (int)a * (int)b;
 }
 
+// Public API: enclose multiplication; double floating corners round outward.
+// Zero times an unbounded endpoint keeps the historical numeric-hull convention;
+// possible NaN values are not represented separately by this interval type.
 interval interval_algebra::Mul(const interval& x, const interval& y) const
 {
     if (x.isEmpty() || y.isEmpty()) {
@@ -53,14 +57,15 @@ interval interval_algebra::Mul(const interval& x, const interval& y) const
     double lo = min4(a, b, c, d);
     double hi = max4(a, b, c, d);
 
-    if ((x.lsb() >= 0) && (y.lsb() >= 0)) {  // operation between integers
+    const bool integerOperands = detail::hasInt32Bounds(x) && detail::hasInt32Bounds(y);
+    if (integerOperands) {
         // if the quotient of an INT limit by an interval limit is below a limit of the other
         // interval ie, if there is something big enough in the other interval to make the interval
         // limit go beyond an INT limit
         if (std::max(std::abs(x.lo()), std::abs(x.hi())) *
                 std::max(std::abs(y.lo()), std::abs(y.hi())) >=
             (double)INT_MAX) {
-            return {(double)INT_MIN, (double)INT_MAX, x.lsb() + y.lsb()};
+            return {(double)INT_MIN, (double)INT_MAX, detail::sumLSB(x.lsb(), y.lsb())};
         }
         /* interval z{lo, hi, x.lsb()+y.lsb()};
         interval shift{pow(2, 31), pow(2, 31), 31};
@@ -82,10 +87,24 @@ interval interval_algebra::Mul(const interval& x, const interval& y) const
         return {min4(aint, bint, cint, dint), max4(aint, bint, cint, dint), x.lsb() + y.lsb()};*/
     }
 
+    if (programPrecision() == 2 && !integerOperands) {
+        lo = HUGE_VAL;
+        hi = -HUGE_VAL;
+        for (double u : {x.lo(), x.hi()}) {
+            for (double v : {y.lo(), y.hi()}) {
+                // 0*inf describes a zero endpoint limit in the numeric hull.
+                const double lower = (u == 0 || v == 0) ? 0 : detail::directedBinary(
+                    detail::BinaryOp::Mul, u, v, detail::Direction::Down);
+                const double upper = (u == 0 || v == 0) ? 0 : detail::directedBinary(
+                    detail::BinaryOp::Mul, u, v, detail::Direction::Up);
+                lo = std::min(lo, lower);
+                hi = std::max(hi, upper);
+            }
+        }
+    }
     return {
         lo, hi,
-        x.lsb() +
-            y.lsb()};  // the worst case, we need all the precision digits from both the operands
+        detail::sumLSB(x.lsb(), y.lsb())};  // keep both operand grids without metadata overflow
 }
 
 void interval_algebra::testMul()
