@@ -66,6 +66,9 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval NumEntry(const interval& name, const interval& init, const interval& lo,
                       const interval& hi, const interval& step) const override;
 
+    // Public API: enclose wrapping int32 absolute value or floating absolute value.
+    // Empty stays empty. Normalize widened integer corridors before endpoint work;
+    // the result retains the input nature, including integral-valued floating zero.
     interval Abs(const interval& x) const override;
     void     testAbs();
     //
@@ -99,6 +102,9 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Inv(const interval& x) const override;
     void     testInv();
     //
+    // Public API: enclose wrapping int32 negation or floating sign reversal.
+    // Empty stays empty. Normalize widened integer corridors before endpoint work;
+    // the result retains the input nature, including integral-valued floating zero.
     interval Neg(const interval& x) const override;
     void     testNeg();
     //
@@ -127,6 +133,9 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval AcoshBounds(const interval& x) const;
     void     testAcosh();
     //
+    // Public API: enclose int32 bitwise operations after integer conversion.
+    // Normalize widened integers before bit analysis; empty stays empty.
+    // Floating inputs are truncated and nonempty results remain integer.
     interval And(const interval& x, const interval& y) const override;
     void     testAnd();
     //
@@ -166,7 +175,7 @@ class interval_algebra : public FaustAlgebra<interval> {
     void     testAtanh();
     //
     // Public API: numeric ceil image; empty stays empty, and integer inputs
-    // first convert to the target float. Single-mode results keep floating nature,
+    // first convert to the target float. Results keep floating nature in every precision,
     // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
     interval Ceil(const interval& x) const override;
     void     testCeil();
@@ -184,6 +193,9 @@ class interval_algebra : public FaustAlgebra<interval> {
     void     testCosh();
     interval Delay(const interval& x, const interval& y) const override;
     void     testDelay();
+    // Public API: enclose comparison after target operand conversions.
+    // Normalize widened integers before deciding a predicate.
+    // Empty stays empty; a nonempty result is integer zero, one or both.
     interval Eq(const interval& x, const interval& y) const override;
     void     testEq();
     interval Exp(const interval& x) const override;
@@ -196,20 +208,30 @@ class interval_algebra : public FaustAlgebra<interval> {
     // Public API: enclose conversion to the program's floating type. In float mode,
     // convert the source endpoints once; IEEE narrowing is monotone. This is a known
     // conversion, not a bound calculation with an unknown analyzer rounding residual.
-    // Floating LSB is retained; NaN keeps the historical empty convention.
+    // Normalize widened integer sources before conversion, retaining a negative
+    // floating LSB in every precision. NaN keeps the historical empty convention.
     interval FloatCast(const interval& x) const override;
     void     testFloatCast();
     // Public API: numeric floor image; empty stays empty, and integer inputs
-    // first convert to the target float. Single-mode results keep floating nature,
+    // first convert to the target float. Results keep floating nature in every precision,
     // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
     interval Floor(const interval& x) const override;
     void     testFloor();
+    // Public API: enclose comparison after target operand conversions.
+    // Normalize widened integers before deciding a predicate.
+    // Empty stays empty; a nonempty result is integer zero, one or both.
     interval Ge(const interval& x, const interval& y) const override;
     void     testGe();
+    // Public API: enclose comparison after target operand conversions.
+    // Normalize widened integers before deciding a predicate.
+    // Empty stays empty; a nonempty result is integer zero, one or both.
     interval Gt(const interval& x, const interval& y) const override;
     void     testGt();
     interval IntCast(const interval& x) const override;
     void     testIntCast();
+    // Public API: enclose comparison after target operand conversions.
+    // Normalize widened integers before deciding a predicate.
+    // Empty stays empty; a nonempty result is integer zero, one or both.
     interval Le(const interval& x, const interval& y) const override;
     void     testLe();
     interval Log(const interval& x) const override;
@@ -224,20 +246,41 @@ class interval_algebra : public FaustAlgebra<interval> {
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval Log10Bounds(const interval& x) const;
     void     testLog10();
+    // Public API: enclose wrapping int32 left shift for counts in [0,31].
+    // Convert operands to integers first. Invalid counts have no portable execution
+    // contract and conservatively return full int32; this does not define such shifts.
     interval Lsh(const interval& x, const interval& y) const override;
     void     testLsh();
+    // Public API: enclose comparison after target operand conversions.
+    // Normalize widened integers before deciding a predicate.
+    // Empty stays empty; a nonempty result is integer zero, one or both.
     interval Lt(const interval& x, const interval& y) const override;
     void     testLt();
+    // Public API: enclose maximum after target operand conversions.
+    // Empty stays empty; widened integers recover their signed hull.
+    // The result is floating exactly when either operand is floating.
     interval Max(const interval& x, const interval& y) const override;
     void     testMax();
     interval Mem(const interval& x) const override;
     void     testMem();
+    // Public API: enclose minimum after target operand conversions.
+    // Empty stays empty; widened integers recover their signed hull.
+    // The result is floating exactly when either operand is floating.
     interval Min(const interval& x, const interval& y) const override;
     void     testMin();
+    // Public API: enclose comparison after target operand conversions.
+    // Normalize widened integers before deciding a predicate.
+    // Empty stays empty; a nonempty result is integer zero, one or both.
     interval Ne(const interval& x, const interval& y) const override;
     void     testNe();
+    // Public API: enclose int32 bitwise complement after integer conversion.
+    // ~x = -1-x reverses signed order, so endpoints suffice even for full int32;
+    // enumerating that range would not terminate. The low bit is always significant.
     interval Not(const interval& x) const override;
     void     testNot();
+    // Public API: enclose int32 bitwise operations after integer conversion.
+    // Normalize widened integers before bit analysis; empty stays empty.
+    // Floating inputs are truncated and nonempty results remain integer.
     interval Or(const interval& x, const interval& y) const override;
     void     testOr();
     interval Pow(const interval& x, const interval& y) const override;  // for all cases
@@ -252,16 +295,22 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval Remainder(const interval& x, const interval& y) const override;
     void     testRemainder();
     // Public API: numeric rint image; empty stays empty, and integer inputs
-    // first convert to the target float. Single-mode results keep floating nature,
+    // first convert to the target float. Results keep floating nature in every precision,
     // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
     interval Rint(const interval& x) const override;
     void     testRint();
     // Public API: numeric round image; empty stays empty, and integer inputs
-    // first convert to the target float. Single-mode results keep floating nature,
+    // first convert to the target float. Results keep floating nature in every precision,
     // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
     interval Round(const interval& x) const override;
     void     testRound();
+    // Public API: enclose arithmetic int32 right shift for counts in [0,31].
+    // Arithmetic shifts round negative quotients downward; real scaling alone can
+    // miss the actual integer result. Invalid counts conservatively return full int32.
     interval ARsh(const interval& x, const interval& y) const override;
+    // Public API: enclose logical int32 right shift for counts in [0,31].
+    // A positive shift sees the uint32 bit pattern; shift zero retains the original
+    // signed value. Split at zero to handle the unsigned ordering discontinuity.
     interval LRsh(const interval& x, const interval& y) const override;
     void     testRsh();
     interval Sin(const interval& x) const override;
@@ -293,6 +342,9 @@ class interval_algebra : public FaustAlgebra<interval> {
     // their historical rule. LSB is an estimate; NaN is not tracked separately.
     interval TanhBounds(const interval& x) const;
     void     testTanh();
+    // Public API: enclose int32 bitwise operations after integer conversion.
+    // Normalize widened integers before bit analysis; empty stays empty.
+    // Floating inputs are truncated and nonempty results remain integer.
     interval Xor(const interval& x, const interval& y) const override;
     void     testXor();
 

@@ -90,7 +90,7 @@ int main()
           algebra.SinBounds(interval(1e100)) == interval(-1, 1) &&
           algebra.CosBounds(interval(1e100)) == interval(-1, 1));
     check("double: fmod with a huge quotient is exactly representable", true,
-          algebra.Fmod(interval(largest), interval(3 * tiny)).is(2 * tiny));
+          algebra.Fmod(algebra.FloatNum(largest), algebra.FloatNum(3 * tiny)).is(2 * tiny));
     using namespace itv::detail;
     check("double: scalar IEEE remainder uses ties-to-even", true,
           directedBinary(BinaryOp::Remainder, 3, 2, Direction::Down) == -1 &&

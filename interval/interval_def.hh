@@ -150,9 +150,10 @@ class interval {
         if (n == 0.0 && m == 0.0) {
             fLo  = 0.0;
             fHi  = 0.0;
-            // Float zero must retain its nature: a later mixed operation still
-            // converts integer operands to float instead of wrapping as int32.
-            fLSB = programPrecision() == 1 && lsb < 0 ? lsb : 0;
+            // Zero carries the requested nature and grid in every precision.
+            // Otherwise a computed floating zero can turn a later operation into
+            // int32 wrapping, or a delay can discard an integer signal's grid.
+            fLSB = lsb == INT_MIN ? -24 : lsb;
             // std::cerr << "Warning: creating an interval with both bounds equal to zero."
             //           << std::endl;
             return;

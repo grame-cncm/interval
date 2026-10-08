@@ -143,7 +143,10 @@ class AffineOps : public Base {
         if (x.isEmpty() || y.isEmpty()) return aempty();
         // Binary32 rounding is a staircase, not an affine function of time.
         // Collapse float corridors over the horizon and use the outward oracle.
-        if (programPrecision() == 1 && (x.lsb < 0 || y.lsb < 0))
+        // Mixed operations must also recover any wrapped integer hull before its
+        // conversion to floating point, in double as well as single precision.
+        if ((x.lsb < 0 || y.lsb < 0) &&
+            (programPrecision() == 1 || integerMayWrap(x) || integerMayWrap(y)))
             return c2(x, y, [this](const interval& a, const interval& b) { return fItv.Add(a, b); });
         if (programPrecision() == 2) {
             const AffItv result{detail::directedBinary(detail::BinaryOp::Add, x.a0, y.a0, detail::Direction::Down),
@@ -165,7 +168,8 @@ class AffineOps : public Base {
     AffItv Sub(const AffItv& x, const AffItv& y) const override
     {
         if (x.isEmpty() || y.isEmpty()) return aempty();
-        if (programPrecision() == 1 && (x.lsb < 0 || y.lsb < 0))
+        if ((x.lsb < 0 || y.lsb < 0) &&
+            (programPrecision() == 1 || integerMayWrap(x) || integerMayWrap(y)))
             return c2(x, y, [this](const interval& a, const interval& b) { return fItv.Sub(a, b); });
         if (programPrecision() == 2) {
             const AffItv result{detail::directedBinary(detail::BinaryOp::Sub, x.a0, y.b0, detail::Direction::Down),
@@ -240,11 +244,12 @@ class AffineOps : public Base {
     AffItv BitCast(const AffItv& x) const override { return x; }
     AffItv FloatCast(const AffItv& x) const override
     {
-        // Even a constant integer corridor needs the target conversion; moving
-        // corridors cannot retain a real-valued slope through binary32 narrowing.
-        if (programPrecision() == 1)
+        // Constant corridors must acquire floating nature in double too. Integer
+        // moving corridors first recover their wrapped hull; binary32 narrowing
+        // also prevents floating slopes from remaining affine.
+        if (programPrecision() == 1 || x.isConst() || x.lsb >= 0)
             return c1(x, [this](const interval& a) { return fItv.FloatCast(a); });
-        if (x.isEmpty() || x.isConst()) return x;
+        if (x.isEmpty()) return aempty();
         AffItv r = x;
         r.lsb    = std::min(x.lsb, -24);  // the value is now carried by a float
         return r;
@@ -467,17 +472,18 @@ class AffineOps : public Base {
     }
 
     //--- soundfiles -------------------------------------------------------------------
+    // Metadata is int32 independently of the program's sample precision.
     AffItv SoundFile(const AffItv&) const override
     {
-        return fromItv(interval(0, 2147483647.0));
+        return fromItv(interval(0, 2147483647.0, 0));
     }
     AffItv SoundFileRate(const AffItv&, const AffItv&) const override
     {
-        return fromItv(interval(0, 2147483647.0));
+        return fromItv(interval(0, 2147483647.0, 0));
     }
     AffItv SoundFileLength(const AffItv&, const AffItv&) const override
     {
-        return fromItv(interval(0, 2147483647.0));
+        return fromItv(interval(0, 2147483647.0, 0));
     }
     AffItv SoundFileBuffer(const AffItv&, const AffItv&, const AffItv&,
                            const AffItv&) const override
@@ -503,6 +509,14 @@ class AffineOps : public Base {
     }
 
    protected:
+    // A floating operation must not consume the unwrapped coefficients of an
+    // integer corridor which has crossed int32 somewhere in its horizon.
+    bool integerMayWrap(const AffItv& x) const
+    {
+        return x.lsb >= 0 && (std::min(x.lo(0), x.lo(fT)) < -2147483648.0 ||
+                             std::max(x.hi(0), x.hi(fT)) > 2147483647.0);
+    }
+
     template <typename F>
     AffItv c1(const AffItv& x, F f) const
     {
@@ -526,9 +540,11 @@ class AffineOps : public Base {
         auto op = [&](const interval& a, const interval& b) {
             return isDiv ? fItv.Div(a, b) : fItv.Mul(a, b);
         };
-        // Chording rounded endpoint values need not enclose staircase values
-        // between them. Float operations use a constant sound hull instead.
-        if (programPrecision() == 1 && (isDiv || x.lsb < 0 || y.lsb < 0))
+        // Chording rounded endpoint values need not enclose staircase values.
+        // Mixed/division paths also collapse integer corridors before floating
+        // conversion: a wrap between endpoints cannot be represented by a chord.
+        if ((programPrecision() == 1 && (isDiv || x.lsb < 0 || y.lsb < 0)) ||
+            ((isDiv || x.lsb < 0 || y.lsb < 0) && (integerMayWrap(x) || integerMayWrap(y))))
             return fromItv(op(toItv(x, fT), toItv(y, fT)));
         if ((isDiv && !y.isConst()) || x.isConst() == y.isConst()) {
             return fromItv(op(toItv(x, fT), toItv(y, fT)));

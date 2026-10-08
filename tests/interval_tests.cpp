@@ -158,20 +158,20 @@ int main()
         // the general conformity pass : Abs, Lsh, LRsh, Remainder
         checkExact("integer abs containing INT_MIN reaches both ends",
                    ia.Abs(interval(IMIN, 5, 0)), interval(IMIN, IMAX, 0));
-        checkExact("integer lsh overflowing widens to full int32",
+        checkExact("integer singleton left shift wraps exactly",
                    ia.Lsh(interval(1, 1, 0), interval(31, 31, 0)),
-                   interval(IMIN, IMAX, 0 + 31));
+                   interval(IMIN, IMIN, 0));
         checkExact("logical rsh of a negative by k>=1 is bounded",
                    ia.LRsh(interval(-8, -8, 0), interval(1, 1, 0)),
-                   interval(0, IMAX, 0));
+                   interval(2147483644.0, 2147483644.0, 0));
         checkExact("logical rsh by a possible 0 keeps the negatives reachable",
                    ia.LRsh(interval(-8, -8, 0), interval(0, 1, 0)),
-                   interval(IMIN, IMAX, 0));
+                   interval(-8, 2147483644.0, 0));
         checkExact("remainder band", ia.Remainder(interval(0, 100, 0), interval(2, 2, 0)),
-                   interval(-1, 1, 0));
+                   interval(-1, 1, -24));
         checkExact("remainder identity below half the divisor",
                    ia.Remainder(interval(3, 3, 0), interval(8, 8, 0)),
-                   interval(3, 3, 0));
+                   interval(3, 3, -24));
         checkExact("int cast of a possibly out-of-range float is the full int32 range",
                    ia.IntCast(interval(1e10, 2e10, -24)), interval(IMIN, IMAX, 0));
         checkExact("int cast of an in-range float truncates exactly",

@@ -61,6 +61,12 @@ target_link_libraries(FloatConservativenessTests PRIVATE interval)
 add_executable(FloatBoundsTests tests/float_bounds_tests.cpp)
 target_link_libraries(FloatBoundsTests PRIVATE interval)
 
+# Integration regressions also compile the affine/public headers as their C++17
+# Faust consumers do; the precision loop checks the same typing contract twice.
+add_executable(FaustIntegrationTests tests/faust_integration_tests.cpp)
+set_target_properties(FaustIntegrationTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(FaustIntegrationTests PRIVATE interval)
+
 enable_testing()
 add_test(NAME interval_unit_tests COMMAND IntervalTests)
 add_test(NAME directed_bounds_tests COMMAND DirectedBoundsTests)
@@ -68,6 +74,7 @@ add_test(NAME float_inclusion_tests COMMAND FloatConservativenessTests)
 set_tests_properties(float_inclusion_tests PROPERTIES LABELS "float-inclusion")
 add_test(NAME float_bounds_tests COMMAND FloatBoundsTests)
 set_tests_properties(float_bounds_tests PROPERTIES LABELS "float-inclusion")
+add_test(NAME faust_integration_tests COMMAND FaustIntegrationTests)
 
 if(INTERVAL_ENABLE_MPFR_TESTS)
     find_package(PkgConfig QUIET)

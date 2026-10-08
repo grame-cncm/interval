@@ -28,7 +28,7 @@ namespace itv {
 // void testRint();
 
 // Public API: numeric rint image; empty stays empty, and integer inputs
-// first convert to the target float. Single-mode results keep floating nature,
+// first convert to the target float. Results keep floating nature in every precision,
 // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
 interval interval_algebra::Rint(const interval& input) const
 {
@@ -38,7 +38,7 @@ interval interval_algebra::Rint(const interval& input) const
     }
 
     return {std::rint(x.lo()), std::rint(x.hi()),
-            detail::floatingLSB(std::max(0, x.lsb()))};  // integral grid, with floating nature in single mode
+            detail::floatingLSB(std::max(0, x.lsb()))};  // integral grid, with floating nature
 }
 
 void interval_algebra::testRint()

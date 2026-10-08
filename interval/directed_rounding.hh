@@ -34,46 +34,51 @@ enum class UnaryOp {
 // Quad/fixed keep their old rules; the analyzer never narrows a reference step.
 inline bool usesNativeBounds() { return programPrecision() == 1 || programPrecision() == 2; }
 
-// Mixed floating/int expressions convert integer operands to the target float
-// before evaluation. Enclosing that conversion avoids computing on a non-float
-// integer endpoint (e.g. 16777217). Already-floating domains are unchanged.
-inline interval floatingOperand(const interval& x)
-{
-    return programPrecision() == 1 && x.lsb() >= 0
-        ? interval(programBound(x.lo()), programBound(x.hi()), -24) : x;
-}
-
-// A numerical floating result must not reenter int32 wrapping merely because
-// its estimated grid has a nonnegative LSB. Explicit IntCast still marks integers.
-inline int floatingLSB(int lsb)
-{
-    return programPrecision() == 1 ? std::min(lsb, -1) : lsb;
-}
-
-// LSB is the legacy integer marker, but an out-of-range or infinite bound must
-// never reach a C++ int cast. Such corridors are handled numerically instead.
+// LSB is the nature marker independently of the program's floating precision.
+// Only bounded int32 corridors may reach the integer rules' C++ endpoint casts.
 inline bool hasInt32Bounds(const interval& x)
 {
     return x.lsb() >= 0 && x.lo() >= -2147483648.0 && x.hi() <= 2147483647.0;
 }
 
-// Under the wrapping semantics, an integer interval (nonnegative LSB) whose bounds
-// leave int32 describes any int32 : an infinite bound from the widening of an integer
-// recursion, or a finite one from the affine domain evaluated at its horizon (a
-// counter reaches 2^31). Normalizing it keeps the integer path : the floating path
-// ignores the wrap and certifies values the program never computes (12345 + [0, +inf]
-// is not [12345, +inf] in int32). A float literal enters through FloatNum, whose
-// negative LSB keeps it on the floating path. Applied when both operands are integers.
+// Under wrapping semantics an integer corridor outside int32, including an
+// infinite widening or an affine horizon overflow, has lost its signed range.
+// Use the full int32 hull before ANY operation or conversion, retaining nature.
 inline interval int32Hull(const interval& x)
 {
     if (x.isEmpty() || x.lsb() < 0 || hasInt32Bounds(x)) return x;
     return {-2147483648.0, 2147483647.0, x.lsb()};
 }
 
+// Normalize each integer even in a mixed expression: conversion to floating
+// point must include negative states reachable through an earlier integer wrap.
 inline std::pair<interval, interval> int32Operands(const interval& x, const interval& y)
 {
-    if (x.lsb() >= 0 && y.lsb() >= 0) return {int32Hull(x), int32Hull(y)};
-    return {x, y};
+    return {int32Hull(x), int32Hull(y)};
+}
+
+// Floating results never become int32 because their values happen to be integral.
+// The sign convention applies in double as well as single precision.
+inline int floatingLSB(int lsb) { return std::min(lsb, -1); }
+
+// Convert an integer operand once to the target floating type before evaluation.
+// Nearest rounding is monotone; already-floating corridors are unchanged. A
+// widened integer first recovers its signed hull, then loses the integer marker.
+inline interval floatingOperand(const interval& input)
+{
+    const interval x = int32Hull(input);
+    return x.isEmpty() || x.lsb() < 0 ? x
+        : interval(programBound(x.lo()), programBound(x.hi()), -24);
+}
+
+// Comparisons and min/max convert both operands when either is floating. Pure
+// integer comparisons keep exact endpoints, notably above 2^24 in float mode.
+inline std::pair<interval, interval> comparisonOperands(const interval& x, const interval& y)
+{
+    const auto operands = int32Operands(x, y);
+    if (x.lsb() < 0 || y.lsb() < 0)
+        return {floatingOperand(operands.first), floatingOperand(operands.second)};
+    return operands;
 }
 
 // Metadata must not overflow signed int when an underflowed power already has

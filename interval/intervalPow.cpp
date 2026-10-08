@@ -204,7 +204,10 @@ interval interval_algebra::PowBounds(const interval& xIn, const interval& yIn) c
         // Preserve the established grid estimate for bounded integer exponents;
         // their endpoint powers are now themselves evaluated with outward arithmetic.
         if (y.lsb() >= 0 && y.lo() >= 0 && y.hi() <= INT32_MAX &&
-            std::isfinite(x.lo()) && std::isfinite(x.hi())) return iPow(x, y);
+            std::isfinite(x.lo()) && std::isfinite(x.hi())) {
+            const interval result = iPow(x, y);
+            return {result.lo(), result.hi(), detail::floatingLSB(result.lsb())};
+        }
         return detail::doublePowBounds(x, y);
     }
 

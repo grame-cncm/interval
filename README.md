@@ -41,8 +41,8 @@ The interval describes what the *compiled program* can produce, not the mathemat
 range:
 
 - **Integer operations** model signed 32-bit arithmetic with two's-complement
-  wrapping. Generated C/C++ programs must be compiled with `-fwrapv` (GCC/Clang) —
-  the option applies to the generated program, not to the Faust compiler itself.
+  wrapping. Both the analyzer and generated C/C++ integer arithmetic must preserve
+  that contract, for example with `-fwrapv` on GCC/Clang.
 - **Integer modulo** (both operands with `lsb >= 0`) follows C semantics: the result
   has the sign of `x`, its magnitude is at most `min(|x|max, m-1)` with `m` the
   largest divisor magnitude, and `x % y = x` whenever `|x|` stays below the smallest
@@ -50,18 +50,16 @@ range:
   `|y|`.
 
 - **Floating-point operations** use `itv::programPrecision()`: 2 double by default,
-  1 single, 3 quad, 4 fixed point. Double mode uses the directed reference
-  calculations described below. The other modes retain their existing rules:
-  notably, single-precision bounds are converted to the nearest float when an
-  interval is constructed, including subnormal rounding and underflow to zero.
-  Those rules are not yet a general conservative analysis of float programs.
+  1 single, 3 quad, 4 fixed point. Single and double use directed reference
+  calculations. Single narrows computed bounds outward to binary32 after each
+  operation; explicitly known literals/conversions use nearest rounding.
+  Quad and fixed point retain their existing rules.
 - **Target-libm compensation** uses `itv::libmCompensation()`, enabled by default.
   The historical margin is two ULPs of the program precision, clipped to known
   function images. It is an assumption, not a universal bound for arbitrary
-  libms. In double mode, the reference calculation uses the native kernel even when this
+  libms. In single and double mode, the native reference kernel is used even when
   compensation is disabled; computed singletons no longer bypass the margin.
-  The other modes retain their previous singleton exemption and host-libm
-  evaluation, which need a separate audit.
+  Quad/fixed retain their previous singleton exemption and host-libm evaluation.
 
 Compiler reassociation, target approximations and recurrence invariants require
 an explicit execution contract. A local bound calculation alone cannot certify
@@ -169,9 +167,45 @@ mathematical enclosure and binary32 rounding, including subnormals and overflow.
 Passing finite tests supports these rules; it is not a proof for every Faust
 program, unrestricted compiler transformations, recurrence or target libm.
 
+## Integer and floating nature
+
+The sign of `lsb` is the nature marker in both simple and double precision:
+`lsb >= 0` means integer, and `lsb < 0` means floating. Integral-valued floating
+results, including zero, `round` and `rint`, must retain a negative marker.
+Inject typed literals through `IntNum` and `FloatNum`; the scalar
+`interval(double)` constructor infers its marker from the value and cannot
+identify the source type.
+
+An integer corridor leaving int32, whether through infinite widening or finite
+horizon overflow, is normalized to `[INT_MIN, INT_MAX]` before integer arithmetic,
+implicit floating conversion or comparison. This normalization preserves the
+integer marker; leaving int32 never selects floating semantics. Initial zeros
+in affine delays inherit the signal's marker. Soundfile metadata remains integer.
+Bitwise operations and shifts produce integers; arithmetic right shift rounds
+negative quotients downward, rather than keeping real-valued scaled bounds.
+Shift counts outside `[0,31]` receive a full hull, which does not define an
+invalid runtime shift.
+
+`FaustIntegrationTests` checks these rules in both precisions, including a
+post-widening LCG invariant and independent runtime witnesses for the second
+noise channel of `rain`. The permanent reduced DSP and a deterministic output
+driver live in `tests/faust/`; they can also be tested with a real Faust compiler:
+
+```sh
+python3 tests/faust/run.py --faust /path/to/faust/build/bin/faust \
+  --reference /path/to/trusted/faust --faust-root /path/to/faust
+```
+
+The runner checks both the reduced program and the full example, in `cpp` and
+`ocpp`, single and double, with 4096 frames per case. It rejects non-finite values,
+a silent output channel, and runtime differences from the optional reference.
+Use `--cxx` and `--cxxflags` to select the C++ compiler or sanitizers.
+
 ## Building and optional MPFR oracle
 
-A normal build needs a C++20 compiler and CMake, with **no MPFR/GMP dependency**:
+The library and its public/affine headers support C++17, with **no MPFR/GMP
+production dependency**. The complete test build uses C++20; the integration
+regressions deliberately compile as C++17 to exercise that consumer contract:
 
 ```sh
 cmake -S . -B build -DNOTIDY=ON

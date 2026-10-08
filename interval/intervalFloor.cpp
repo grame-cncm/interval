@@ -28,7 +28,7 @@ namespace itv {
 // void testFloor();
 
 // Public API: numeric floor image; empty stays empty, and integer inputs
-// first convert to the target float. Single-mode results keep floating nature,
+// first convert to the target float. Results keep floating nature in every precision,
 // so subsequent operations cannot incorrectly enter the int32 wrapping branch.
 interval interval_algebra::Floor(const interval& input) const
 {

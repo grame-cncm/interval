@@ -48,5 +48,6 @@ build-native*/
 build-float*/
 build-oracle*/
 build-wasm*/
+build-integration*/
 
 todo
