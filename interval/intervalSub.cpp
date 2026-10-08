@@ -33,8 +33,9 @@ static double sub(double a, double b)
 
 // Public API: enclose subtraction; float/double floating bounds round outward at each
 // endpoint, while the existing int32 wrapping and other precision paths remain.
-interval interval_algebra::Sub(const interval& x, const interval& y) const
+interval interval_algebra::Sub(const interval& xIn, const interval& yIn) const
 {
+    const auto [x, y] = detail::int32Operands(xIn, yIn);
     if (x.isEmpty() || y.isEmpty()) {
         return empty();
     }

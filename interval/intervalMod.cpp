@@ -135,8 +135,9 @@ interval positiveFMod(const interval& x, const interval& y)
 // Public API: integer C modulo for integer operands, otherwise numeric fmod.
 // Float/double floating bounds avoid rounded quotient tests and unsafe int casts;
 // invalid-only domains yield empty and NaN is not represented separately.
-interval interval_algebra::Mod(const interval& x, const interval& y) const
+interval interval_algebra::Mod(const interval& xIn, const interval& yIn) const
 {
+    const auto [x, y] = detail::int32Operands(xIn, yIn);
     if (x.isEmpty() || y.isEmpty()) {
         return empty();
     }

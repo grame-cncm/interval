@@ -185,8 +185,9 @@ interval interval_algebra::iPow(const interval& x, const interval& y) const
 // Public API: numeric power image. Float/double floating powers round outward; negative
 // bases use integer exponents by parity. The existing nonnegative integer-power
 // path retains wrapping and LSB estimates. NaN is not tracked separately.
-interval interval_algebra::PowBounds(const interval& x, const interval& y) const
+interval interval_algebra::PowBounds(const interval& xIn, const interval& yIn) const
 {
+    const auto [x, y] = detail::int32Operands(xIn, yIn);
     if (x.isEmpty() || y.isEmpty()) {
         return empty();
     }

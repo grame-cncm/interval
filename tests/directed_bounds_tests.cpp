@@ -39,6 +39,17 @@ int main()
           overflow.lo() == largest && overflow.hi() == HUGE_VAL);
     check("double: integral-looking huge bounds never enter an int cast", true,
           algebra.Add(interval(largest), interval(largest)).has(HUGE_VAL));
+    // An integer recursion widened to +inf is any int32 under the wrapping semantics :
+    // the integer rules must not take the floating path (no wrap) on it.
+    const interval widenedInt(0, HUGE_VAL, 0);
+    check("double: integer + widened integer keeps the int32 wrap", true,
+          algebra.Add(algebra.IntNum(12345), widenedInt).has(-1));
+    check("double: integer * widened integer keeps the int32 wrap", true,
+          algebra.Mul(algebra.IntNum(1103515245), widenedInt).has(-1));
+    check("double: integer - widened integer stays within int32", true,
+          algebra.Sub(algebra.IntNum(0), widenedInt) == interval(INT_MIN, INT_MAX, 0));
+    check("double: widened integer % 100 is an integer remainder", true,
+          algebra.Mod(widenedInt, algebra.IntNum(100)) == interval(-99, 99, 0));
     check("double: an indeterminate infinite corner does not erase numeric values", true,
           algebra.Add(interval(HUGE_VAL), interval(-HUGE_VAL, 0)).has(HUGE_VAL));
     const interval quotient = algebra.Div(interval(1, 1, -24), interval(10, 10, -24));
