@@ -98,7 +98,7 @@ int main()
     check("double: outward overflow keeps max-finite below +inf", true,
           overflow.lo() == largest && overflow.hi() == HUGE_VAL);
     check("double: integral-looking huge bounds never enter an int cast", true,
-          algebra.Add(interval(largest), interval(largest)).has(HUGE_VAL));
+          algebra.Add(algebra.FloatNum(largest), algebra.FloatNum(largest)).has(HUGE_VAL));
     check("double: an indeterminate infinite corner does not erase numeric values", true,
           algebra.Add(interval(HUGE_VAL), interval(-HUGE_VAL, 0)).has(HUGE_VAL));
     const interval quotient = algebra.Div(interval(1, 1, -24), interval(10, 10, -24));
