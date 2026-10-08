@@ -130,6 +130,13 @@ decisions. The single/quad/fixed paths retain their previous rules and need
 their own audit. The new transcendental reference is intended for inclusion;
 its performance and tightness in the complete Faust compiler need measurement.
 
+Six reproducible missing inclusions in the current float mode are documented in
+[FLOAT_COUNTEREXAMPLES.md](FLOAT_COUNTEREXAMPLES.md), including an analyzed
+nonnegative integer delay whose strict float execution produces `-1`.
+`FloatConservativenessTests` requires inclusion by default and currently fails.
+CTest labels these as `known-float-gaps` and uses an explicit expected-gap mode;
+a passing known-gap test confirms the defect, not float conservativeness.
+
 ## Building and optional MPFR oracle
 
 A normal build needs a C++20 compiler and CMake, with **no MPFR/GMP dependency**:
@@ -148,8 +155,8 @@ cmake --build build-oracle
 ctest --test-dir build-oracle --output-on-failure
 ```
 
-Only `MPFROracleTests` links MPFR/GMP; the library and both ordinary test
-executables remain independent of them. For this optional test, install
+Only the optional oracle executables link MPFR/GMP; the library and the
+dependency-free test executables remain independent of them. For this optional test, install
 `libmpfr-dev libgmp-dev` on Debian/Ubuntu, `mpfr` through Homebrew or MacPorts on
 macOS, or `mpfr:x64-windows` through vcpkg on Windows. Use `CMAKE_PREFIX_PATH`
 for a nonstandard installation or the vcpkg CMake toolchain on Windows. An

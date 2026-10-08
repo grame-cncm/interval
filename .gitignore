@@ -45,6 +45,7 @@ testinterval
 build/**
 build-directed*/
 build-native*/
+build-float*/
 build-oracle*/
 build-wasm*/
 

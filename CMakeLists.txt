@@ -52,9 +52,16 @@ target_link_libraries(IntervalTests PRIVATE interval)
 add_executable(DirectedBoundsTests tests/directed_bounds_tests.cpp)
 target_link_libraries(DirectedBoundsTests PRIVATE interval)
 
+# These inclusion checks are intentionally red until the float rules are fixed.
+# CTest explicitly records known gaps; direct execution requires true inclusion.
+add_executable(FloatConservativenessTests tests/float_conservativeness_tests.cpp)
+target_link_libraries(FloatConservativenessTests PRIVATE interval)
+
 enable_testing()
 add_test(NAME interval_unit_tests COMMAND IntervalTests)
 add_test(NAME directed_bounds_tests COMMAND DirectedBoundsTests)
+add_test(NAME float_known_gaps COMMAND FloatConservativenessTests --expect-known-gaps)
+set_tests_properties(float_known_gaps PROPERTIES LABELS "known-float-gaps")
 
 if(INTERVAL_ENABLE_MPFR_TESTS)
     find_package(PkgConfig QUIET)
@@ -72,4 +79,12 @@ if(INTERVAL_ENABLE_MPFR_TESTS)
     target_include_directories(MPFROracleTests PRIVATE ${MPFR_INCLUDE_DIR} ${GMP_INCLUDE_DIR})
     target_link_libraries(MPFROracleTests PRIVATE interval ${MPFR_LIBRARY} ${GMP_LIBRARY})
     add_test(NAME mpfr_oracle_tests COMMAND MPFROracleTests)
+
+    # Optional independent binary32 witnesses, rounding at each target operation.
+    add_executable(FloatConservativenessOracleTests tests/float_conservativeness_tests.cpp)
+    target_compile_definitions(FloatConservativenessOracleTests PRIVATE INTERVAL_FLOAT_MPFR_ORACLE=1)
+    target_include_directories(FloatConservativenessOracleTests PRIVATE ${MPFR_INCLUDE_DIR} ${GMP_INCLUDE_DIR})
+    target_link_libraries(FloatConservativenessOracleTests PRIVATE interval ${MPFR_LIBRARY} ${GMP_LIBRARY})
+    add_test(NAME float_known_gaps_mpfr COMMAND FloatConservativenessOracleTests --expect-known-gaps)
+    set_tests_properties(float_known_gaps_mpfr PROPERTIES LABELS "known-float-gaps;mpfr")
 endif()
