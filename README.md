@@ -12,8 +12,11 @@ Herrou, Stéphane Letz.
 ## The two roles of the interval computation
 
 - **Correctness** — the program runs right: delay lines sized from provable bounds,
-  table accesses provably within `[0, size)` (clamps elided when proven, kept when
-  not), no division by zero, no NaN, no infinity, compile-time error reporting.
+  table indices certified within `[0, size)`, no division by zero, no NaN, no
+  infinity, compile-time error reporting. For reliable static validation, an
+  uncertified table index must cause a diagnostic rejection; explicit index
+  clamping belongs in the author's program. These are the intended guarantees,
+  subject to the limitations described below.
 - **Sound quality** — the precision of the computations: in fixed point (FPGA
   targets), a signal's format takes its integer bits (msb) from its range and its
   fractional bits from the lsb analysis, so a tighter interval converts directly into
@@ -200,6 +203,16 @@ The runner checks both the reduced program and the full example, in `cpp` and
 `ocpp`, single and double, with 4096 frames per case. It rejects non-finite values,
 a silent output channel, and runtime differences from the optional reference.
 Use `--cxx` and `--cxxflags` to select the C++ compiler or sanitizers.
+
+The separate [rejection corpus](tests/faust/REJECTIONS.md) requires Faust to
+reject an unbounded `rwtable` write index even when its read index is safe:
+
+```sh
+python3 tests/faust/run-rejections.py --faust /path/to/faust/build/bin/faust
+```
+
+This test currently exposes a missing compiler rejection; it does not pass by
+silently adding a runtime clamp and is separate from the standalone library tests.
 
 ## Building and optional MPFR oracle
 
