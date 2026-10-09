@@ -73,6 +73,12 @@ add_executable(InvalidityTests tests/invalidity_tests.cpp)
 set_target_properties(InvalidityTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(InvalidityTests PRIVATE interval)
 
+# Delay zero must preserve the complete affine form, including empty states;
+# the same C++17 regressions cover initialization when a positive delay is possible.
+add_executable(DelayTests tests/delay_tests.cpp)
+set_target_properties(DelayTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(DelayTests PRIVATE interval)
+
 enable_testing()
 add_test(NAME interval_unit_tests COMMAND IntervalTests)
 add_test(NAME directed_bounds_tests COMMAND DirectedBoundsTests)
@@ -82,6 +88,7 @@ add_test(NAME float_bounds_tests COMMAND FloatBoundsTests)
 set_tests_properties(float_bounds_tests PROPERTIES LABELS "float-inclusion")
 add_test(NAME faust_integration_tests COMMAND FaustIntegrationTests)
 add_test(NAME invalidity_tests COMMAND InvalidityTests)
+add_test(NAME delay_tests COMMAND DelayTests)
 
 if(INTERVAL_ENABLE_MPFR_TESTS)
     find_package(PkgConfig QUIET)

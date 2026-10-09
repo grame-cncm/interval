@@ -326,6 +326,13 @@ flag, so a flag-only change cannot masquerade as fixpoint convergence. Numeric
 intersection preserves existing alerts, rather than proving away earlier invalid
 execution. `libmBounds`, casts and both affine bridges retain the attribute.
 
+`Delay(x, n)` converts the sample count to int32. If its valid numeric image is
+exactly zero, it preserves `x`: bounds, LSB, numeric emptiness and every affine
+coefficient. Alerts from either operand remain visible. If a positive delay is
+possible, including when the count spans `[0, N]`, initial zero is still included.
+`Mem` remains a one-sample delay. This distinction prevents `x@0` from introducing
+zero into a strictly positive range and making its reciprocal unbounded.
+
 `IntCast` considers truncation toward zero: in double mode, `2147483647.75`
 converts validly to `INT_MAX`; `2147483648` does not. An invalid-only input has
 no valid numeric integer result; a partly valid input keeps its truncated valid
@@ -363,6 +370,8 @@ affine transfers, partial domains, invalid-only values, flag-only convergence,
 joint infinite arguments, cast thresholds and independent NaN witnesses. Optional
 `InvalidityOracleTests` adds MPFR domain and truncation checks. See
 [VALIDITY.md](VALIDITY.md) for the French implementation and migration notes.
+`DelayTests` verifies the zero-delay identity and positive/variable initialization
+in both precisions, including the reciprocal witness from the Faust integration.
 
 ## Building and optional MPFR oracle
 

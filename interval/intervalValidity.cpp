@@ -213,8 +213,9 @@ interval interval_algebra::CoshBounds(const interval& x) const
     return numericCoshBounds(x).withInvalid(detail::unaryInvalid(detail::UnaryOp::Cosh, x));
 }
 
-// Public API: Delay encloses valid numeric results and conservatively retains
-// input invalidity and any possible operation-domain violation.
+// Public API: enclose Delay after int32 conversion of the sample count.
+// Exactly zero preserves bounds and LSB; possibly positive counts include
+// initial zero. Retain invalidity of either operand and the delay domain.
 interval interval_algebra::Delay(const interval& x, const interval& y) const
 {
     return numericDelay(x, y).withInvalid(detail::delayInvalid(x, y));

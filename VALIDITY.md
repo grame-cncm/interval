@@ -91,6 +91,14 @@ alerte. Une entrée partiellement admissible conserve ses résultats tronqués
 valides. Les opérations bitwise et les décalages ne perdent pas l’alerte d’une
 conversion préalable. Le flag ne rend jamais défini un cast C++ interdit.
 
+Un retard dont le montant, après conversion vers int32, est exactement zéro est
+l’identité : `x@0` conserve les bornes, le `lsb`, les coefficients affines et les
+états vides de `x`. Les alertes du signal et du montant restent propagées. Un
+montant variable dans `[0, N]`, avec `N > 0`, doit encore inclure la valeur initiale
+zéro ; son minimum nul ne prouve pas l’identité. `Mem` reste un retard d’un
+échantillon. La conversion précède aussi le décalage temporel des coefficients :
+un montant `1.75` correspond à un échantillon, jamais à 1.75 échantillon.
+
 Le chemin des puissances entières avec wrapping exige un exposant non négatif.
 Un exposant entier potentiellement négatif porte donc une alerte ; il ne doit
 pas être interprété silencieusement comme zéro. Les puissances négatives
@@ -140,6 +148,17 @@ par le test**.
 La cible facultative `InvalidityOracleTests` ajoute un oracle MPFR à 256 bits
 pour les domaines unaires/binaires et la troncature vers int32. MPFR/GMP ne sont
 pas des dépendances de production.
+
+La cible C++17 `DelayTests` vérifie ces règles de retard en float et double,
+y compris les corridors mobiles et les deux opérandes porteurs d’alertes. Elle
+reproduit le témoin 03 de l’intégration : une fréquence strictement positive lue
+à `@0` garde un inverse fini et une conversion entière définie. Les tests de
+validité composent également les témoins 13 (conversion hors plage avant les
+`min/max`), 14 (décalage négatif produit par un décalage arithmétique) et le cas
+d’un coefficient nul après sous-dépassement float multiplié par l’infini.
+Les tests complets de dépendance entre expressions et d’horizon des ressources
+restent côté compilateur : l’interface numérique ne dispose pas des arbres et
+dimensions nécessaires à ces règles.
 
 ```sh
 cmake -S . -B build -DNOTIDY=ON -DINTERVAL_ENABLE_MPFR_TESTS=ON

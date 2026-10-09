@@ -320,8 +320,9 @@ class interval_algebra : public FaustAlgebra<interval> {
     // input invalidity and any possible operation-domain violation.
     interval CoshBounds(const interval& x) const;
     void     testCosh();
-    // Public API: Delay encloses valid numeric results and conservatively retains
-    // input invalidity and any possible operation-domain violation.
+    // Public API: enclose Delay after int32 conversion of the sample count.
+    // Exactly zero preserves bounds and LSB; possibly positive counts include
+    // initial zero. Retain invalidity of either operand and the delay domain.
     interval Delay(const interval& x, const interval& y) const override;
     void     testDelay();
     // Public API: enclose comparison after target operand conversions.

@@ -395,6 +395,77 @@ void structuralTests(int precision)
           a.ForeignConst(0, label, label).mayBeInvalid());
 }
 
+void integrationCompositionTests(int precision)
+{
+    programPrecision() = precision;
+    const interval_algebra a;
+    const affine_algebra affine(32);
+    const std::string p = precision == 1 ? "float integration witnesses: " : "double integration witnesses: ";
+
+    // Witness 13: some legal bend values exceed int32 at 192 kHz. Authored
+    // min/max AFTER the cast cannot make the preceding conversion defined.
+    const interval bend(1.19e-7, 10, -24);
+    const interval period = a.Div(a.FloatNum(192000), a.Mul(a.FloatNum(440), bend));
+    const AffItv aperiod = affine.Div(affine.FloatNum(192000),
+        affine.Mul(affine.FloatNum(440), fromItv(bend)));
+    const interval cast = a.IntCast(period);
+    const AffItv acast = affine.IntCast(aperiod);
+    const interval after = a.Min(a.IntNum(4096), a.Max(a.IntNum(0), cast));
+    const interval aafter = toItv(affine.Min(affine.IntNum(4096),
+        affine.Max(affine.IntNum(0), acast)), 32);
+    check(p + "13 period really crosses the int32 boundary", true,
+          period.hi() >= 2147483648.0 && toItv(aperiod, 32).hi() >= 2147483648.0);
+    check(p + "13 both casts signal the excluded inputs", true,
+          cast.mayBeInvalid() && acast.mayBeInvalid);
+    check(p + "13 bounded indices retain the invalid conversion alert", true,
+          after.lo() >= 0 && after.hi() <= 4096 && after.mayBeInvalid() &&
+          aafter.lo() >= 0 && aafter.hi() <= 4096 && aafter.mayBeInvalid());
+    const interval before = a.IntCast(a.Min(a.FloatNum(4096), a.Max(a.FloatNum(0), period)));
+    const interval abefore = toItv(affine.IntCast(affine.Min(affine.FloatNum(4096),
+        affine.Max(affine.FloatNum(0), aperiod))), 32);
+    check(p + "13 explicitly bounding finite inputs before conversion is defined", true,
+          before.isValid() && abefore.isValid() && before.lo() >= 0 && before.hi() <= 4096 &&
+          abefore.lo() >= 0 && abefore.hi() <= 4096);
+
+    // Witness 14: a signed arithmetic shift retains -1, which then becomes an
+    // invalid left-shift count. Only the analyzer evaluates the second shift.
+    const interval right = a.ARsh(a.IntNum(-1), a.IntNum(2));
+    const AffItv aright = affine.ARsh(affine.IntNum(-1), affine.IntNum(2));
+    checkExact(p + "14 ordinary signed right shift keeps -1", right, a.IntNum(-1));
+    checkExact(p + "14 affine signed right shift keeps -1", toItv(aright, 32), a.IntNum(-1));
+    const interval left = a.Lsh(a.IntNum(-1), right);
+    const AffItv aleft = affine.Lsh(affine.IntNum(-1), aright);
+    check(p + "14 composed negative shift count remains invalid", true,
+          left.mayBeInvalid() && aleft.mayBeInvalid);
+    check(p + "14 subsequent bounds cannot erase the invalid shift", true,
+          a.Min(a.IntNum(1), a.Max(a.IntNum(0), left)).mayBeInvalid() &&
+          affine.Min(affine.IntNum(1), affine.Max(affine.IntNum(0), aleft)).mayBeInvalid);
+
+    // The window_kaiser observation: this coefficient vanishes only in binary32.
+    // Numeric zero must not become a foldable constant if the product can be NaN.
+    const interval coefficient = a.FloatNum(1e-48);
+    const interval product = a.Mul(coefficient, a.FloatNum(HUGE_VAL));
+    const AffItv aproduct = affine.Mul(fromItv(coefficient), affine.FloatNum(HUGE_VAL));
+    check(p + "underflowed coefficient has the expected target value", true,
+          precision == 1 ? coefficient.isZero() : coefficient.lo() > 0);
+    check(p + "zero times infinity is invalid only when the coefficient vanishes", true,
+          product.mayBeInvalid() == (precision == 1) &&
+          aproduct.mayBeInvalid == (precision == 1));
+    const interval bounded = a.Min(a.FloatNum(1), a.Max(a.FloatNum(-1), product));
+    const interval abounded = toItv(affine.Min(affine.FloatNum(1),
+        affine.Max(affine.FloatNum(-1), aproduct)), 32);
+    check(p + "product alert survives authored bounds and int conversion", true,
+          bounded.mayBeInvalid() == (precision == 1) &&
+          abounded.mayBeInvalid() == (precision == 1) &&
+          a.IntCast(bounded).mayBeInvalid() == (precision == 1) &&
+          affine.IntCast(fromItv(abounded)).mayBeInvalid == (precision == 1));
+    if (precision == 1) {
+        check(p + "alerted zero cannot be folded through singleton predicates", true,
+              product.hasZero() && !product.isZero() && !product.isconst() &&
+              !bounded.isconst() && !abounded.isconst());
+    }
+}
+
 // Independent runtime witnesses use libm solely to observe NaN creation; the
 // test does not assume that libm gives correctly rounded finite results.
 void nanWitnessTests(int precision)
@@ -552,6 +623,7 @@ int main()
         domainTests(precision);
         conversionTests(precision);
         structuralTests(precision);
+        integrationCompositionTests(precision);
         nanWitnessTests(precision);
 #ifdef INTERVAL_INVALIDITY_MPFR_ORACLE
         mpfrDomainTests(precision);

@@ -210,7 +210,11 @@ class AffineOps : public Base {
     { return delayed(x, 1); }
     AffItv numericDelay(const AffItv& x, const AffItv& n) const
     {
-        const interval nn = toItv(n, fT);
+        const interval nn = fItv.IntCast(toItv(n, fT));
+        // Exactly zero is the identity, even for empty or moving corridors.
+        // A zero minimum alone is insufficient: a variable positive delay still
+        // needs initialization. The public transfer attaches either input alert.
+        if (!nn.isEmpty() && nn.lo() == 0 && nn.hi() == 0) return x;
         const double   nlo =
             (nn.isEmpty() || !std::isfinite(nn.lo())) ? 0 : std::max(0.0, nn.lo());
         return delayed(x, nlo);
@@ -659,7 +663,9 @@ class AffineOps : public Base {
         return numericMem(x).withInvalid(x.mayBeInvalid);
     }
 
-    // Public API: enclose Delay over the horizon, retaining possible invalidity.
+    // Public API: enclose Delay after int32 conversion of the sample count.
+    // Exactly zero preserves every coefficient; possibly positive counts include
+    // initial zero. Retain invalidity of either operand and the delay domain.
     AffItv Delay(const AffItv& x, const AffItv& n) const override
     {
         return numericDelay(x, n).withInvalid(detail::delayInvalid(toItv(x, fT), toItv(n, fT)));
@@ -1090,7 +1096,9 @@ class AffineOps : public Base {
         return r;
     }
 
-    /// x delayed by at least nlo samples, then joined with the initial condition. A
+    /// x delayed by at least nlo samples, with a positive delay still possible,
+    /// then joined with the initial condition. An exactly zero count bypasses this
+    /// helper; nlo == 0 here does not prove identity. A
     /// growing bound shifted back in time is smaller: intercept -= nlo * rate is the
     /// sound shift, and the shift is what makes accumulators stationary. A bound whose
     /// rate has the wrong sign collapses to its worst constant over the window.

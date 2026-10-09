@@ -2,7 +2,7 @@ These notes on testing the intervals results are destined to future library cont
 
 # Test suites
 
-The project has six dependency-free regression executables and four optional
+The project has seven dependency-free regression executables and four optional
 oracle targets, plus the experimental `TestInterval` program:
 
 - `IntervalTests` contains fast, deterministic regression tests. It checks interval bounds and
@@ -39,11 +39,19 @@ oracle targets, plus the experimental `TestInterval` program:
 
 - `FaustIntegrationTests` checks float/double nature and int32 wrapping through
   the ordinary/affine bridge, including the rain noise recurrence, as C++17.
+- `DelayTests`, also C++17, checks that an exactly zero converted sample count
+  preserves numeric bounds, LSB, empty states, affine coefficients and alerts.
+  Positive and possibly positive delays retain initial zero; fractional amounts
+  are truncated before applying the temporal rule. The positive-frequency
+  reciprocal/conversion chain reproduces integration witness 03.
 - `InvalidityTests`, also C++17, checks the separate `mayBeInvalid` attribute:
   numeric bottom versus invalid-only, partial domains, every numeric transfer's
   propagation, flag-aware ordering/joins/widening, UI/selection/effect operands,
   foreign/resource uncertainty, joint infinite arguments, undefined casts,
-  modulo and shift counts. It exercises both float and double. Runtime NaN
+  modulo and shift counts. Composed integration witnesses check cast overflow
+  before min/max (13), a negative shift count produced by an arithmetic right
+  shift (14), and a binary32-underflowed coefficient times infinity. It exercises
+  both float and double. Runtime NaN
   witnesses and fixed-seed bit patterns independently check classification;
   the test never executes an invalid C++ float-to-int conversion.
 - `InvalidityOracleTests`, enabled by the same MPFR option, additionally checks
@@ -55,6 +63,14 @@ The validity regression can be run independently:
 ```sh
 ctest --test-dir build -R invalidity --output-on-failure
 ```
+
+The delay regressions run with `ctest --test-dir build -R delay_tests --output-on-failure`.
+The source witnesses and their compiler-level results are described in
+[intervalles-temoins](../faust-migration/intervalles-temoins/README.md). Relational
+rules (shared operands, guarded branches, waveform elements, recurrence solvers
+and resource horizons) require compiler context and are not promised by these
+value-only library tests. The conversion and shift tests never execute undefined
+C++ operations, and authored bounds do not erase an earlier invalidity alert.
 
 The real-Faust rejection corpus remains separate: it requires an external compiler
 and currently records missing diagnostic rejections, rather than treating inserted
