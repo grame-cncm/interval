@@ -170,6 +170,9 @@ void inclusion(int precision)
     const interval U = A.Iir(interval(0, 1, -24), {interval(1, 1, -24)});
     expect(!U.isValid() && !U.isBounded(), "an integrator gives anything" + p);
     expect(!A.Iir(interval(0, 1, -24).withInvalid(true), {interval(0.5, 0.5, -24)}).isValid(), "iir keeps an alert" + p);
+    // an integer recursion wraps : a congruential generator stays in int32, valid
+    const interval G = A.Iir(interval(12345, 12345, 0), {interval(1103515245, 1103515245, 0)});
+    expect(G.isValid() && G.lo() >= -2147483648.0 && G.hi() <= 2147483647.0, "an integer recursion stays in int32" + p);
 }
 
 void firs()
