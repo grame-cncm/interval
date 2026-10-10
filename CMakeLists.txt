@@ -79,7 +79,16 @@ add_executable(DelayTests tests/delay_tests.cpp)
 set_target_properties(DelayTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(DelayTests PRIVATE interval)
 
-# The compound operations Frac, Cfrac and Mix : precision, inclusion of the program's
+# The kernels Sum, Fir and Iir : the certified gain of a recursive filter, inclusion of the
+# program's values (float and double, random and adversarial inputs).
+add_executable(KernelTests tests/kernel_tests.cpp)
+set_target_properties(KernelTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(KernelTests PRIVATE interval)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    set_source_files_properties(tests/kernel_tests.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=off")
+endif()
+
+# The compound operations Frac, Cfrac, Mix and Tpt : precision, inclusion of the program's
 # values (plain and with a fused multiply-add), validity.
 add_executable(CompoundTests tests/compound_tests.cpp)
 set_target_properties(CompoundTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
@@ -99,6 +108,7 @@ add_test(NAME faust_integration_tests COMMAND FaustIntegrationTests)
 add_test(NAME invalidity_tests COMMAND InvalidityTests)
 add_test(NAME delay_tests COMMAND DelayTests)
 add_test(NAME compound_tests COMMAND CompoundTests)
+add_test(NAME kernel_tests COMMAND KernelTests)
 
 if(INTERVAL_ENABLE_MPFR_TESTS)
     find_package(PkgConfig QUIET)

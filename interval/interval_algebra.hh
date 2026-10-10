@@ -1,10 +1,22 @@
 #pragma once
 
+#include <vector>
 #include "interval_def.hh"
 
 #include "FaustAlgebra.hh"
 
 namespace itv {
+
+/// A certified bound of the gain of the stable recursive filter
+/// y(n) = x(n) + sum_j c[j] y(n-1-j) (intervalKernel.cpp) : L bounds the L1 norm of its
+/// impulse response h ; pos and neg are the sums of the positive and negative computed
+/// values of its first `block` samples, within `spread` (their error and the rest of h).
+struct FilterGain {
+    double L, pos, neg, spread;
+    long   block;
+};
+/// false when no bound can be certified (an unstable, too slow or too imprecise filter)
+bool filterGain(const std::vector<double>& c, FilterGain& gain);
 class interval_algebra : public FaustAlgebra<interval> {
    private:
     interval iPow(const interval& x, const interval& y) const;  // integer power, when x can be negative
@@ -493,6 +505,12 @@ class interval_algebra : public FaustAlgebra<interval> {
     // Tpt(x) = x / (x + 1), increasing on ]-1, +inf[ : its image there, the definition
     // elsewhere
     interval Tpt(const interval& x) const override;
+    // Public API : the kernels (intervalKernel.cpp) : Sum and Fir as their definitions,
+    // Iir by the certified gain of a stable filter with constant coefficients, rounding
+    // included ; anything, NaN included, otherwise
+    interval Sum(const std::vector<interval>& terms) const override;
+    interval Fir(const interval& x, const std::vector<interval>& coefs) const override;
+    interval Iir(const interval& x, const std::vector<interval>& coefs) const override;
     void     testRint();
     // Public API: numeric round image; empty stays empty, and integer inputs
     // first convert to the target float. Results keep floating nature in every precision,

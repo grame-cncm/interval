@@ -950,6 +950,39 @@ class AffineOps : public Base {
         return c1(x, [this](const interval& a) { return fItv.Tpt(a); }).withInvalid(x.mayBeInvalid);
     }
 
+    // The kernels : Sum and Fir as their definitions over the corridors, Iir by the
+    // gain rule of the intervals over the horizon
+    AffItv Sum(const std::vector<AffItv>& terms) const override
+    {
+        if (terms.empty()) return this->IntNum(0);
+        AffItv acc = terms[0];
+        for (size_t k = 1; k < terms.size(); k++) acc = this->Add(acc, terms[k]);
+        return acc;
+    }
+    AffItv Fir(const AffItv& x, const std::vector<AffItv>& coefs) const override
+    {
+        bool   first = true;
+        AffItv acc;
+        for (size_t k = 0; k < coefs.size(); k++) {
+            const AffItv& ck = coefs[k];
+            if (!ck.isEmpty() && ck.isConst() && ck.a0 == 0 && ck.b0 == 0 && !ck.mayBeInvalid) continue;
+            AffItv term = (k == 0) ? this->Mul(ck, x) : this->Mul(ck, this->Delay(x, this->IntNum(int(k))));
+            acc         = first ? term : this->Add(acc, term);
+            first       = false;
+        }
+        return first ? this->IntNum(0) : acc;
+    }
+    AffItv Iir(const AffItv& x, const std::vector<AffItv>& coefs) const override
+    {
+        if (x.isEmpty()) return aempty();
+        std::vector<interval> cs;
+        for (const AffItv& ck : coefs) {
+            if (ck.isEmpty()) return aempty();
+            cs.push_back(toItv(ck, fT));
+        }
+        return fromItv(fItv.Iir(toItv(x, fT), cs));
+    }
+
     // Public API: enclose Round over the horizon, retaining possible invalidity.
     AffItv Round(const AffItv& x) const override
     {

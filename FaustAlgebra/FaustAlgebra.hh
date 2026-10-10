@@ -143,6 +143,17 @@ class FaustAlgebra
     virtual T Mix(const T& c, const T& a, const T& b) const   = 0;  // (1 - c) * a + c * b
     virtual T Tpt(const T& x) const                           = 0;  // x / (x + 1)
 
+    // The kernels of the signal language : an n-ary sum, a finite and an infinite impulse
+    // response filter, each one taken as ONE operation (an interval domain bounds a
+    // recursive filter by its gain, which its definition, a recursion, cannot give). No
+    // default, as above.
+    //   Sum(t)    = t[0] + t[1] + ...
+    //   Fir(x, c) = sum_k c[k] * x(n - k)
+    //   Iir(x, c) = y, where y(n) = x(n) + sum_k c[k] * y(n - 1 - k) and y(n < 0) = 0
+    virtual T Sum(const std::vector<T>& terms) const                = 0;
+    virtual T Fir(const T& x, const std::vector<T>& coefs) const    = 0;
+    virtual T Iir(const T& x, const std::vector<T>& coefs) const    = 0;
+
     // Delays, Tables and SoundFiles
     virtual T Mem(const T& x) const = 0;
     virtual T Delay(const T& x, const T& y) const = 0;
