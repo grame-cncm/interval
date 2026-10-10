@@ -185,6 +185,15 @@ void firs()
     expect(Z.lo() == 0 && Z.hi() == 0, "an all-zero fir is 0");
     const interval S = A.Sum({interval(0, 1, -24), interval(2, 3, -24), interval(-1, 0, -24)});
     expect(S.lo() <= 1 && S.lo() > 0.999 && S.hi() >= 4 && S.hi() < 4.001, "sum of [0,1], [2,3], [-1,0] is [1, 4]");
+    // a product from left to right : the bounds of the binary chain, bit for bit
+    programPrecision() = 1;
+    const interval a(0.1, 0.3, -24), b(-3.7, -2.1, -24), c(1.0 / 3, 0.7, -24);
+    const interval P = A.Prod({a, b, c});
+    const interval Q = A.Mul(A.Mul(a, b), c);
+    expect(P.lo() == Q.lo() && P.hi() == Q.hi(), "prod(a, b, c) is (a * b) * c");
+    expect(P.lo() <= -0.3 * 3.7 * 0.7 && P.hi() >= -0.1 * 2.1 / 3, "prod of [0.1,0.3], [-3.7,-2.1], [1/3,0.7] holds its exact range");
+    const interval U = A.Prod({});
+    expect(U.lo() == 1 && U.hi() == 1, "an empty product is 1");
 }
 
 }  // namespace

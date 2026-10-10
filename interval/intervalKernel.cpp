@@ -206,6 +206,15 @@ interval interval_algebra::Sum(const std::vector<interval>& terms) const
     return acc;
 }
 
+// Prod : the products from left to right
+interval interval_algebra::Prod(const std::vector<interval>& factors) const
+{
+    if (factors.empty()) return IntNum(1);
+    interval acc = factors[0];
+    for (size_t k = 1; k < factors.size(); k++) acc = Mul(acc, factors[k]);
+    return acc;
+}
+
 // Fir : the products of the coefficients by the delayed samples, a null coefficient
 // skipped (the definition, as the signal dispatch expanded it)
 interval interval_algebra::Fir(const interval& x, const std::vector<interval>& coefs) const

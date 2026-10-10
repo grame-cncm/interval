@@ -505,10 +505,12 @@ class interval_algebra : public FaustAlgebra<interval> {
     // Tpt(x) = x / (x + 1), increasing on ]-1, +inf[ : its image there, the definition
     // elsewhere
     interval Tpt(const interval& x) const override;
-    // Public API : the kernels (intervalKernel.cpp) : Sum and Fir as their definitions,
+    // Public API : the kernels (intervalKernel.cpp) : Sum, Prod and Fir as their
+    // definitions (a sum and a product from left to right, the association of the code),
     // Iir by the certified gain of a stable filter with constant coefficients, rounding
     // included ; anything, NaN included, otherwise
     interval Sum(const std::vector<interval>& terms) const override;
+    interval Prod(const std::vector<interval>& factors) const override;
     interval Fir(const interval& x, const std::vector<interval>& coefs) const override;
     interval Iir(const interval& x, const std::vector<interval>& coefs) const override;
     void     testRint();

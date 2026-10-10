@@ -950,13 +950,20 @@ class AffineOps : public Base {
         return c1(x, [this](const interval& a) { return fItv.Tpt(a); }).withInvalid(x.mayBeInvalid);
     }
 
-    // The kernels : Sum and Fir as their definitions over the corridors, Iir by the
-    // gain rule of the intervals over the horizon
+    // The kernels : Sum, Prod and Fir as their definitions over the corridors (from left
+    // to right), Iir by the gain rule of the intervals over the horizon
     AffItv Sum(const std::vector<AffItv>& terms) const override
     {
         if (terms.empty()) return this->IntNum(0);
         AffItv acc = terms[0];
         for (size_t k = 1; k < terms.size(); k++) acc = this->Add(acc, terms[k]);
+        return acc;
+    }
+    AffItv Prod(const std::vector<AffItv>& factors) const override
+    {
+        if (factors.empty()) return this->IntNum(1);
+        AffItv acc = factors[0];
+        for (size_t k = 1; k < factors.size(); k++) acc = this->Mul(acc, factors[k]);
         return acc;
     }
     AffItv Fir(const AffItv& x, const std::vector<AffItv>& coefs) const override
