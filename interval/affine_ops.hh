@@ -929,6 +929,27 @@ class AffineOps : public Base {
         return numericRint(x).withInvalid(x.mayBeInvalid);
     }
 
+    // Public API: the compound operations collapse to the interval rule over the
+    // horizon (nonlinear), retaining possible invalidity.
+    AffItv Frac(const AffItv& x) const override
+    {
+        return c1(x, [this](const interval& a) { return fItv.Frac(a); }).withInvalid(x.mayBeInvalid);
+    }
+    AffItv Cfrac(const AffItv& x) const override
+    {
+        return c1(x, [this](const interval& a) { return fItv.Cfrac(a); }).withInvalid(x.mayBeInvalid);
+    }
+    AffItv Mix(const AffItv& c, const AffItv& a, const AffItv& b) const override
+    {
+        if (c.isEmpty() || a.isEmpty() || b.isEmpty()) return aempty();
+        return fromItv(fItv.Mix(toItv(c, fT), toItv(a, fT), toItv(b, fT)))
+            .withInvalid(c.mayBeInvalid || a.mayBeInvalid || b.mayBeInvalid);
+    }
+    AffItv Tpt(const AffItv& x) const override
+    {
+        return c1(x, [this](const interval& a) { return fItv.Tpt(a); }).withInvalid(x.mayBeInvalid);
+    }
+
     // Public API: enclose Round over the horizon, retaining possible invalidity.
     AffItv Round(const AffItv& x) const override
     {

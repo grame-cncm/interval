@@ -131,6 +131,18 @@ class FaustAlgebra
     virtual T Tanh(const T& x) const = 0;
     virtual T Xor(const T& x, const T& y) const = 0;
 
+    // Compound operations : each one is the definition written beside it, taken as ONE
+    // operation so that a repeated operand appears once (the dependency problem of the
+    // analyses : x - floor(x) read as two independent values loses that the result
+    // lies in [0, 1]). No default : every algebra says what the operation is in its
+    // domain -- an attribute algebra computes it, a tree algebra builds the node. A
+    // default definition would silently dissolve the node in a tree algebra that forgot
+    // to override it.
+    virtual T Frac(const T& x) const                          = 0;  // x - floor(x)
+    virtual T Cfrac(const T& x) const                         = 0;  // x - rint(x)
+    virtual T Mix(const T& c, const T& a, const T& b) const   = 0;  // (1 - c) * a + c * b
+    virtual T Tpt(const T& x) const                           = 0;  // x / (x + 1)
+
     // Delays, Tables and SoundFiles
     virtual T Mem(const T& x) const = 0;
     virtual T Delay(const T& x, const T& y) const = 0;

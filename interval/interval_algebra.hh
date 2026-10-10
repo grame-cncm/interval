@@ -484,6 +484,15 @@ class interval_algebra : public FaustAlgebra<interval> {
     // Public API: Rint encloses valid numeric results and conservatively retains
     // input invalidity and any possible operation-domain violation.
     interval Rint(const interval& x) const override;
+    // Public API : the compound operations (FaustAlgebra), each bounded as one
+    // operation : Frac(x) = x - floor(x) in [0, 1], Cfrac(x) = x - rint(x) in [-1/2, 1/2],
+    // Mix(c, a, b) = (1 - c) a + c b between a and b for c in [0, 1] (intervalCompound.cpp)
+    interval Frac(const interval& x) const override;
+    interval Cfrac(const interval& x) const override;
+    interval Mix(const interval& c, const interval& a, const interval& b) const override;
+    // Tpt(x) = x / (x + 1), increasing on ]-1, +inf[ : its image there, the definition
+    // elsewhere
+    interval Tpt(const interval& x) const override;
     void     testRint();
     // Public API: numeric round image; empty stays empty, and integer inputs
     // first convert to the target float. Results keep floating nature in every precision,
@@ -647,6 +656,14 @@ class interval_algebra : public FaustAlgebra<interval> {
     interval numericRDTbl(const interval& wtbl, const interval& ri) const;
     interval numericRemainder(const interval& xInput, const interval& yInput) const;
     interval numericRint(const interval& input) const;
+    interval numericFrac(const interval& x) const;
+    interval numericCfrac(const interval& x) const;
+    interval numericTpt(const interval& x) const;
+    // the definitions, operation by operation (their operands then read as independent) :
+    // the bounds outside of the premise of Mix and of the domain of Tpt
+    interval mixDefinition(const interval& c, const interval& a, const interval& b) const;
+    interval tptDefinition(const interval& x) const;
+    interval numericMix(const interval& c, const interval& a, const interval& b) const;
     interval numericRound(const interval& input) const;
     interval numericSelect2(const interval& x, const interval& y, const interval& z) const;
     interval numericSin(const interval& x) const;
