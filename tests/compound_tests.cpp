@@ -208,6 +208,45 @@ void tpts(int precision)
     expect(ends == 0, "inclusion of tpt at the ends" + p + (ends ? " -- " + std::to_string(ends) + " values outside" : ""));
 }
 
+template <typename T>
+void phases(int precision)
+{
+    programPrecision() = precision;
+    const std::string      p = precision == 1 ? " (float)" : " (double)";
+    const interval_algebra A;
+    std::mt19937           rng(4242);
+
+    // the counter of ba.period(P) / P : x % P below P, P of a variable rate
+    const interval c = A.Phase(interval(1, 19200, 0), interval(5, 19200, 0));
+    expect(c.lo() >= 0 && c.hi() <= 1 && c.isValid(), "phase of a counter lies in [0, 1]" + p);
+    const interval d = A.Div(A.Mod(interval(1, 19200, 0), interval(5, 19200, 0)), interval(5, 19200, 0));
+    expect(d.hi() > 1000, "its definition, read as two values, does not" + p);
+    const interval n = A.Phase(interval(-10, -1, 0), interval(2, 100, 0));
+    expect(n.lo() >= -1 && n.hi() <= 0, "phase of a negative x lies in [-1, 0]" + p);
+    const interval m = A.Phase(interval(-10, 10, 0), interval(-100, -2, 0));
+    expect(m.lo() >= -1 && m.hi() <= 1, "phase of any x lies in [-1, 1]" + p);
+    const interval q = A.Phase(interval(0, 10, 0), interval(-100, -2, 0));
+    expect(q.lo() >= -1 && q.hi() <= 0, "phase by a negative p lies in [-1, 0]" + p);
+    expect(!A.Phase(interval(0, 10, 0), interval(0, 100, 0)).isValid(), "a divisor that may be 0 alerts" + p);
+    expect(!A.Phase(interval(0, 10, 0), interval(2, 4, 0).withInvalid(true)).isValid(), "phase keeps an alert" + p);
+
+    // inclusion : the program's float(x % p) / float(p) on integers, fmod(x, p) / p on reals
+    int bad = 0;
+    std::uniform_int_distribution<int> ux(0, 1 << 30), up(1, 1 << 30);
+    for (int k = 0; k < 20000; k++) {
+        const int      xi = ux(rng), pi = k < 100 ? xi + 1 : up(rng);
+        const interval R  = A.Phase(interval(0, 1 << 30, 0), interval(1, 1 << 30, 0));
+        if (!within(double(T(xi % pi) / T(pi)), R)) bad++;
+    }
+    std::uniform_real_distribution<double> rx(0, 1000), rp(0.5, 100);
+    const interval Rr = A.Phase(interval(0, 1000, -24), interval(0.5, 100, -24));
+    for (int k = 0; k < 20000; k++) {
+        const T x = value<T>(rx(rng)), q2 = value<T>(rp(rng));
+        if (!within(double(T(std::fmod(x, q2)) / q2), Rr)) bad++;
+    }
+    expect(bad == 0, "inclusion of phase" + p + (bad ? " -- " + std::to_string(bad) + " values outside" : ""));
+}
+
 void affine()
 {
     programPrecision()        = 2;
@@ -225,6 +264,8 @@ void affine()
 
 int main()
 {
+    phases<float>(1);
+    phases<double>(2);
     remainders<float>(1);
     remainders<double>(2);
     mixes<float>(1);

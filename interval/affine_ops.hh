@@ -949,6 +949,12 @@ class AffineOps : public Base {
     {
         return c1(x, [this](const interval& a) { return fItv.Tpt(a); }).withInvalid(x.mayBeInvalid);
     }
+    AffItv Phase(const AffItv& x, const AffItv& p) const override
+    {
+        if (x.isEmpty() || p.isEmpty()) return aempty();
+        const interval r = fItv.Phase(toItv(x, fT), toItv(p, fT));
+        return fromItv(r).withInvalid(x.mayBeInvalid || p.mayBeInvalid || r.mayBeInvalid());
+    }
 
     // The kernels : Sum, Prod and Fir as their definitions over the corridors (from left
     // to right), Iir by the gain rule of the intervals over the horizon

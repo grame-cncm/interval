@@ -23,7 +23,7 @@
 namespace itv {
 
 //------------------------------------------------------------------------------------------
-// The compound operations Frac, Cfrac, Mix and Tpt : each one is its definition, written once as
+// The compound operations Frac, Cfrac, Mix, Tpt and Phase : each one is its definition, written once as
 // an operation so that its repeated operand appears once. Evaluated as two independent
 // values, x - floor(x) loses that the result lies in [0, 1] (the dependency problem).
 //
@@ -102,6 +102,31 @@ interval interval_algebra::tptDefinition(const interval& x) const
 {
     const interval d = Add(x, FloatNum(1.0));
     return Div(x, d);
+}
+
+interval interval_algebra::phaseDefinition(const interval& x, const interval& p) const
+{
+    const interval r = Mod(x, p);
+    return Div(r, p);
+}
+
+// Numeric kernel : x % p has the sign of x and a magnitude below |p|, for the SAME p, so
+// (x % p) / p lies in [-1, 1], of the sign of x times the sign of p. The division may round
+// a ratio below 1 up to 1 (a divisor beyond 2^24 in float) : the bounds are closed. The
+// definition, its operands read as independent, is sound as well : the two are intersected.
+// A divisor that may be 0 leaves the definition alone.
+interval interval_algebra::numericPhase(const interval& x, const interval& p) const
+{
+    if (x.isEmpty() || p.isEmpty()) return empty();
+    const interval def = phaseDefinition(x, p);
+    if (def.isEmpty() || !(p.lo() > 0 || p.hi() < 0)) return def;
+    double lo = -1, hi = 1;
+    if (x.lo() >= 0) {
+        (p.lo() > 0 ? lo : hi) = 0;
+    } else if (x.hi() <= 0) {
+        (p.lo() > 0 ? hi : lo) = 0;
+    }
+    return interval(std::max(lo, def.lo()), std::min(hi, def.hi()), def.lsb());
 }
 
 // Numeric kernel : x - floor(x) lies in [0, 1[ for x >= 0, [0, 1] otherwise
@@ -191,6 +216,13 @@ interval interval_algebra::Tpt(const interval& x) const
     const interval fx = detail::floatingOperand(x);
     if (!(fx.lo() > -1) || !std::isfinite(fx.hi())) return tptDefinition(x);
     return numericTpt(x).withInvalid(x.mayBeInvalid());
+}
+
+// Public API : the validity of the definition (a divisor that may be 0, an invalid operand)
+interval interval_algebra::Phase(const interval& x, const interval& p) const
+{
+    if (x.isEmpty() || p.isEmpty()) return empty();
+    return numericPhase(x, p).withInvalid(phaseDefinition(x, p).mayBeInvalid());
 }
 
 }  // namespace itv

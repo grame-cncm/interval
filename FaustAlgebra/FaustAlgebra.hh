@@ -142,6 +142,7 @@ class FaustAlgebra
     virtual T Cfrac(const T& x) const                         = 0;  // x - rint(x)
     virtual T Mix(const T& c, const T& a, const T& b) const   = 0;  // (1 - c) * a + c * b
     virtual T Tpt(const T& x) const                           = 0;  // x / (x + 1)
+    virtual T Phase(const T& x, const T& p) const             = 0;  // (x % p) / p
 
     // The kernels of the signal language : an n-ary sum and product, a finite and an
     // infinite impulse response filter, each one taken as ONE operation (an interval

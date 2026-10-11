@@ -505,6 +505,9 @@ class interval_algebra : public FaustAlgebra<interval> {
     // Tpt(x) = x / (x + 1), increasing on ]-1, +inf[ : its image there, the definition
     // elsewhere
     interval Tpt(const interval& x) const override;
+    // Phase(x, p) = (x % p) / p : |x % p| < |p| for the same p, so the ratio lies in
+    // [0, 1] (x >= 0, p > 0), [-1, 0] or [-1, 1] by the signs, when p excludes 0
+    interval Phase(const interval& x, const interval& p) const override;
     // Public API : the kernels (intervalKernel.cpp) : Sum, Prod and Fir as their
     // definitions (a sum and a product from left to right, the association of the code),
     // Iir by the certified gain of a stable filter with constant coefficients, rounding
@@ -683,6 +686,8 @@ class interval_algebra : public FaustAlgebra<interval> {
     // the bounds outside of the premise of Mix and of the domain of Tpt
     interval mixDefinition(const interval& c, const interval& a, const interval& b) const;
     interval tptDefinition(const interval& x) const;
+    interval phaseDefinition(const interval& x, const interval& p) const;
+    interval numericPhase(const interval& x, const interval& p) const;
     interval numericMix(const interval& c, const interval& a, const interval& b) const;
     interval numericRound(const interval& input) const;
     interval numericSelect2(const interval& x, const interval& y, const interval& z) const;
