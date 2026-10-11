@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include <numeric>
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -273,6 +274,23 @@ bool filterOutput(const std::vector<double>& c, const interval& fx, double& lo, 
 // rounding included ; anything, NaN included, otherwise
 interval interval_algebra::Iir(const interval& x, const std::vector<interval>& coefs) const
 {
+    // A filter whose non null coefficients sit at the multiples of a step d,
+    // y(n) = x(n) + c_d y(n-d) + c_2d y(n-2d) + ..., has the impulse response of the filter
+    // c_d, c_2d, ... with d - 1 zeros between its samples : the same sum of |h|, the same
+    // signed parts, the same terms per step. Its bound is that filter's, of order n/d (a
+    // comb x + g y(n-N) is a first-order filter) : the companion matrices stay small.
+    {
+        auto isNull = [](const interval& c) { return !c.isEmpty() && c.lo() == 0 && c.hi() == 0 && !c.mayBeInvalid(); };
+        size_t d = 0;
+        for (size_t k = 0; k < coefs.size(); k++) {
+            if (!isNull(coefs[k])) d = std::gcd(d, k + 1);
+        }
+        if (d > 1) {
+            std::vector<interval> reduced;
+            for (size_t k = d - 1; k < coefs.size(); k += d) reduced.push_back(coefs[k]);
+            return Iir(x, reduced);
+        }
+    }
     if (x.isEmpty()) return empty();
     bool invalid = x.mayBeInvalid();
     int  lsb     = std::min(x.lsb(), -1);

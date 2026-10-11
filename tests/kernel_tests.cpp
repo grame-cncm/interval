@@ -194,6 +194,19 @@ void firs()
     expect(P.lo() <= -0.3 * 3.7 * 0.7 && P.hi() >= -0.1 * 2.1 / 3, "prod of [0.1,0.3], [-3.7,-2.1], [1/3,0.7] holds its exact range");
     const interval U = A.Prod({});
     expect(U.lo() == 1 && U.hi() == 1, "an empty product is 1");
+    // a comb x + g y(n-N) is bounded as the first-order filter x + g y(n-1), whatever N
+    programPrecision() = 2;
+    std::vector<interval> comb(2000, interval(0, 0, 0));
+    comb.back()                 = interval(0.7, 0.7, -52);
+    const interval C1           = A.Iir(interval(-1, 1, -52), {interval(0.7, 0.7, -52)});
+    const interval CN           = A.Iir(interval(-1, 1, -52), comb);
+    expect(CN.lo() == C1.lo() && CN.hi() == C1.hi() && CN.isBounded(), "a comb of 2000 samples has the bound of its first-order filter");
+    std::vector<interval> two(6, interval(0, 0, 0));
+    two[2] = interval(0.5, 0.5, -52);
+    two[5] = interval(-0.25, -0.25, -52);
+    const interval T2 = A.Iir(interval(-1, 1, -52), two);
+    const interval T1 = A.Iir(interval(-1, 1, -52), {interval(0.5, 0.5, -52), interval(-0.25, -0.25, -52)});
+    expect(T2.lo() == T1.lo() && T2.hi() == T1.hi(), "taps at 3 and 6 : the filter of taps 1 and 2");
 }
 
 }  // namespace
