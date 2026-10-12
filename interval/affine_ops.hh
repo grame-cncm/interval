@@ -90,8 +90,9 @@ class AffineOps : public Base {
         return ajoin(x, y, fT);
     }
 
+    // an audio input has no assumed range (see interval_algebra::numericInput)
     AffItv numericInput(const AffItv& arg0) const
-    { return fromItv(interval(-1, 1)); }
+    { return fromItv(interval(-HUGE_VAL, HUGE_VAL)); }
     AffItv numericOutput(const AffItv& arg0, const AffItv& x) const
     { return x; }
 

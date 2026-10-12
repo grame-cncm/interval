@@ -10,9 +10,12 @@ interval interval_algebra::numericFixPointUpdate(const interval& x, const interv
 {
     return reunion(x, y);
 }
+// An audio input has no assumed range : a host may send any value through it (a control
+// voltage, a frequency, a phase), and the intervals state what is guaranteed, never a
+// convention. Sound files, normally bounded, keep [-1, 1] (SoundFileBuffer).
 interval interval_algebra::numericInput(const interval& c) const
 {
-    return interval(-1, 1);  // the declared audio-input domain
+    return interval(-HUGE_VAL, HUGE_VAL);
 }
 interval interval_algebra::numericOutput(const interval& c, const interval& y) const
 {

@@ -615,9 +615,24 @@ void mpfrDomainTests(int precision)
 #endif
 }  // namespace
 
+// An audio input has no assumed range ; a sound file keeps [-1, 1]
+void inputRangeTests()
+{
+    const interval_algebra A;
+    const affine_algebra   F(1024);
+    const interval         in = A.Input(interval(0));
+    check("input: an audio input is not bounded", true,
+          in.lo() == -HUGE_VAL && in.hi() == HUGE_VAL && !in.isBounded());
+    const interval fin = toItv(F.Input(F.IntNum(0)), 1024);
+    check("input: nor over the horizon", true, fin.lo() == -HUGE_VAL && fin.hi() == HUGE_VAL);
+    const interval sf = A.SoundFileBuffer(interval(0), interval(0), interval(0), interval(0));
+    check("input: a sound file keeps [-1, 1]", true, sf.lo() == -1 && sf.hi() == 1);
+}
+
 int main()
 {
     representationTests();
+    inputRangeTests();
     for (int precision : {1, 2}) {
         propagationTests(precision);
         domainTests(precision);
