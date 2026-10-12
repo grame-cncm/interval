@@ -259,6 +259,9 @@ mathematical enclosure and binary32 rounding, including subnormals and overflow.
 Passing finite tests supports these rules; it is not a proof for every Faust
 program, unrestricted compiler transformations, recurrence or target libm.
 
+[MIX.md](MIX.md) describes the interval of `mix`, and the power-of-two envelope
+that bounds a recursive smoother whose weight is a few rounding errors below 1.
+
 ## Integer and floating nature
 
 The sign of `lsb` is the nature marker in both simple and double precision:
