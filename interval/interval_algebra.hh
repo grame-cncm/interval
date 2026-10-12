@@ -17,6 +17,15 @@ struct FilterGain {
 };
 /// false when no bound can be certified (an unstable, too slow or too imprecise filter)
 bool filterGain(const std::vector<double>& c, FilterGain& gain);
+/// mix(c, a, b) = (1 - c) * a + c * b is computed as an interpolation from the operand
+/// whose weight may be near 1 : b + (1 - c) * (a - b) when c >= 1/2 (1 - c is then exact,
+/// Sterbenz), a + c * (b - a) otherwise. The generators and the interval of the node apply
+/// this same rule to the interval of c.
+inline bool mixFromB(const interval& c)
+{
+    return !c.isEmpty() && c.lo() >= 0.5;
+}
+
 class interval_algebra : public FaustAlgebra<interval> {
    private:
     interval iPow(const interval& x, const interval& y) const;  // integer power, when x can be negative

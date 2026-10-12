@@ -127,22 +127,75 @@ void mixes(int precision)
     expect(!A.Mix(interval(0, 1, -24), interval(0, 1, -24).withInvalid(true), interval(0, 1, -24)).isValid(),
            "a mix keeps an alert" + p);
 
-    // a case found by search : the interpolation is nearly 4 rounding errors of the largest
-    // operand away from the exact mix, in float
+    // the program's mix : an interpolation from the operand whose weight may be near 1
+    auto program = [](const interval& ic, T c, T a, T b, bool fused) {
+        if (mixFromB(ic)) {
+            const T w = T(1) - c;
+            return fused ? T(std::fma(w, a - b, b)) : T(b + w * (a - b));
+        }
+        return fused ? T(std::fma(c, b - a, a)) : T(a + c * (b - a));
+    };
+
+    // a case found by search : a + c (b - a) is nearly 4 rounding errors of the largest
+    // operand away from the exact mix, in float ; the program interpolates from b
     if (precision == 1) {
         const float    a = 0.5153635740280151f, b = -0.5094743371009827f, c = 0.9999904036521912f;
-        const interval R = A.Mix(interval(c, c, -24), interval(a, a, -24), interval(b, b, -24));
-        expect(within(double(a + c * (b - a)), R), "the interpolation a + c (b - a) of the witness is inside the mix" + p);
+        const interval ic(c, c, -24);
+        const interval R = A.Mix(ic, interval(a, a, -24), interval(b, b, -24));
+        expect(within(double(program(ic, c, a, b, false)), R), "the interpolation of the witness is inside the mix" + p);
     }
 
-    // inclusion : the program's a + c * (b - a), plain and with the product fused
+    // a slow smoother : a weight 1 - c of a few rounding errors keeps a margin of about one
+    // rounding of the result (a margin of 5 would exceed the stability margin of the recursion)
+    {
+        const double   u  = precision == 1 ? std::ldexp(1.0, -24) : std::ldexp(1.0, -53);
+        const double   c  = 1 - 8 * u;
+        const interval R  = A.Mix(interval(c, c, -24), interval(-1, 1, -24), interval(-1, 1, -24));
+        // (plus the 2^-50 relative slack of the ends, computed in double)
+        const double   m  = 2.5 * u + std::ldexp(1.0, -50);
+        expect(R.hi() <= 1 + m && R.lo() >= -1 - m, "near c = 1, the margin of the mix is one rounding" + p);
+    }
+
+    // the power-of-two envelope : both forms, plain and fused, over operands of [-M, M]
+    // (the extremes included) and weights of [0, 1] (near 0, 1/2 and 1 included), stays in
+    // [-M, M] ; a slow smoother then maps [-M, M] into itself
+    {
+        int out = 0;
+        for (double M : {1.0, 16.0, 1024.0, std::ldexp(1.0, -60)}) {
+            std::uniform_real_distribution<double> uv(-M, M), uw(0, 1);
+            const double                           u = precision == 1 ? std::ldexp(1.0, -24) : std::ldexp(1.0, -53);
+            const double specials[] = {0, u, 0.5 - u, 0.5, 0.5 + u, 1 - 4 * u, 1 - 2 * u, 1 - u, 1};
+            for (int s = 0; s < 200000; s++) {
+                const T c = value<T>(s % 3 ? uw(rng) : specials[s % 9]);
+                const T a = value<T>(s % 5 == 0 ? M : s % 5 == 1 ? -M : uv(rng));
+                const T b = value<T>(s % 7 == 0 ? M : s % 7 == 1 ? -M : uv(rng));
+                for (const interval& ic : {interval(0, 1, -24), interval(0.5, 1, -24)}) {
+                    for (bool fused : {false, true}) {
+                        if (std::abs(double(program(ic, c, a, b, fused))) > M) out++;
+                    }
+                }
+            }
+        }
+        expect(out == 0, "both forms of mix stay in a power-of-two envelope" + p +
+                             (out ? " -- " + std::to_string(out) + " values outside" : ""));
+        const double   u = precision == 1 ? std::ldexp(1.0, -24) : std::ldexp(1.0, -53);
+        const interval R = A.Mix(interval(0.4, 1 - 2 * u, -24), interval(-1, 1, -24), interval(-1, 1, -24));
+        expect(R.lo() >= -1 && R.hi() <= 1, "a smoother maps [-1, 1] into itself" + p);
+        const interval Q = A.Mix(interval(0, 1, -24), interval(-12, 12, -24), interval(-12, 12, -24));
+        expect(Q.lo() >= -16 && Q.hi() <= 16, "a mix of [-12, 12] stays in [-16, 16]" + p);
+    }
+
+    // inclusion : the program's interpolation, plain and with the product fused
     struct Case {
         interval c, a, b;
     };
     const Case cases[] = {{interval(0, 1, -24), interval(-12, 12, -24), interval(-12, 12, -24)},
                           {interval(0.999, 0.9999999, -24), interval(0, 1, -24), interval(0, 1, -24)},
                           {interval(0, 0.5, -24), interval(100, 1000, -24), interval(-3, 3, -24)},
-                          {interval(0.2, 0.3, -24), interval(-1e6, 1e6, -24), interval(5, 6, -24)}};
+                          {interval(0.2, 0.3, -24), interval(-1e6, 1e6, -24), interval(5, 6, -24)},
+                          {interval(0.5, 1, -24), interval(-12, 12, -24), interval(-12, 12, -24)},
+                          {interval(0, 0.9999999, -24), interval(-1, 1, -24), interval(-1, 1, -24)},
+                          {interval(0.9999, 0.99999994, -24), interval(-1, 1, -24), interval(-1, 1, -24)}};
     int bad = 0;
     for (const Case& k : cases) {
         const interval R = A.Mix(k.c, k.a, k.b);
@@ -150,8 +203,8 @@ void mixes(int precision)
             ub(k.b.lo(), k.b.hi());
         for (int s = 0; s < 20000; s++) {
             const T c = value<T>(s % 2 ? k.c.hi() : uc(rng)), a = value<T>(ua(rng)), b = value<T>(ub(rng));
-            if (!within(double(a + c * (b - a)), R)) bad++;
-            if (!within(double(std::fma(c, b - a, a)), R)) bad++;
+            if (!within(double(program(k.c, c, a, b, false)), R)) bad++;
+            if (!within(double(program(k.c, c, a, b, true)), R)) bad++;
         }
     }
     expect(bad == 0, "inclusion of mix, plain and fused" + p +

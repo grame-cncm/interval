@@ -52,6 +52,23 @@ double belowOne()
     return 1;
 }
 
+/// the smallest power of two M >= mag such that a mix of operands in [-M, M] stays in
+/// [-M, M] (see numericMix), or 0 when the program has no such envelope : not a binary
+/// floating-point format, or mag beyond its range (an ulp of M far above the subnormal
+/// roundings, and M * (1 + 2u) finite)
+double mixEnvelope(double mag)
+{
+    const int precision = programPrecision();
+    if (precision != 1 && precision != 2) return 0;
+    if (!(mag > 0) || !std::isfinite(mag)) return 0;
+    int          e;
+    const double f = std::frexp(mag, &e);
+    const double M = (f == 0.5) ? mag : std::ldexp(1.0, e);
+    const double lo = (precision == 1) ? std::ldexp(1.0, -126 + 24) : std::ldexp(1.0, -1022 + 53);
+    const double hi = (precision == 1) ? std::ldexp(1.0, 126) : std::ldexp(1.0, 1022);
+    return (M >= lo && M <= hi) ? M : 0;
+}
+
 /// half an ulp of the largest magnitude of x, plus the loss of a flush to zero
 double contractionMargin(const interval& x)
 {
@@ -90,10 +107,16 @@ double rintOf(double v)
 }  // namespace
 
 // The definitions, operation by operation
-// mix(c, a, b) is computed a + c * (b - a), the interpolation : the definition follows the
-// operations of the program
+// mix(c, a, b) is computed as an interpolation from one of its operands (mixFromB) : the
+// definition follows the operations of the program
 interval interval_algebra::mixDefinition(const interval& c, const interval& a, const interval& b) const
 {
+    if (mixFromB(detail::floatingOperand(c))) {
+        const interval w = Sub(FloatNum(1.0), c);
+        const interval d = Sub(a, b);
+        const interval p = Mul(w, d);
+        return Add(b, p);
+    }
     const interval d = Sub(b, a);
     const interval p = Mul(c, d);
     return Add(a, p);
@@ -146,13 +169,23 @@ interval interval_algebra::numericCfrac(const interval& x) const
 // Numeric kernel : (1 - c) a + c b with c in [0, 1] lies between a and b. For a fixed c
 // the mix is linear in c, so its extremes are reached at the two ends of c : computed in
 // double (a 2^-50 relative slack covers their own rounding), then widened by the rounding
-// of the program at any c in between. The program computes a + c * (b - a) : the
-// difference, the product and the sum, the first two on values up to twice the largest
-// operand, at most 5 rounding errors of it, 6 with the second-order terms. A mix of
-// nonnegative operands stays nonnegative whatever the rounding (and symmetrically) : b - a
-// is at least -a, so is c * (b - a) for c in [0, 1], each rounding being monotone, and a
-// plus it is at least 0. Outside of its premise (c beyond [0, 1], an unbounded operand),
-// the mix is its definition.
+// of the program at any c in between : an interpolation from a (or b, see mixFromB), with
+// w the largest weight of the difference, c (or 1 - c, exact), and W the largest |b - a|.
+// The difference and the product cost (2u + u^2) w W, the sum u times the result : about
+// one rounding of the result when w is small (a slow smoother).
+//
+// Two envelopes then bound the result whatever the rounding, each rounding to nearest
+// being monotone and odd. A mix of nonnegative operands stays nonnegative (and
+// symmetrically) : the interpolation adds to its base a difference at least minus the
+// base, times a weight in [0, 1]. A mix of operands in [-M, M], M a power of two, stays in
+// [-M, M] : a + c (b - a) is at most a + fl(M - a), since c fl(b - a) <= fl(M - a) ; and
+// fl(M - a) exceeds M - a by at most half an ulp of a value below 2M, u M, so that the sum
+// is at most the midpoint M (1 + u) between M and the next float, rounded to the even M
+// (the same with the product fused, and from b with the weight 1 - c in [0, 1]). This
+// envelope bounds a recursive smoother y = mix(c, x, y') whose stability margin 1 - c is
+// a few rounding errors, smaller than its rounding : the fixpoint of the margins diverges,
+// the envelope [-M, M] maps into itself. Outside of its premise (c beyond [0, 1], an
+// unbounded operand), the mix is its definition.
 interval interval_algebra::numericMix(const interval& c, const interval& a, const interval& b) const
 {
     if (c.isEmpty() || a.isEmpty() || b.isEmpty()) return empty();
@@ -168,10 +201,18 @@ interval interval_algebra::numericMix(const interval& c, const interval& a, cons
         hi             = std::max(hi, w * fa.hi() + e * fb.hi());
     }
     const double mag = std::max({std::abs(fa.lo()), std::abs(fa.hi()), std::abs(fb.lo()), std::abs(fb.hi())});
-    const double eps = (6 * unitRoundoff() + std::ldexp(1.0, -50)) * mag + std::ldexp(1.0, -122);
+    const double u   = unitRoundoff();
+    const double w   = mixFromB(fc) ? 1 - fc.lo() : fc.hi();
+    const double W   = std::max(fa.hi(), fb.hi()) - std::min(fa.lo(), fb.lo());
+    const double eps = ((2 * u + u * u) * w * W + u * mag) * (1 + std::ldexp(1.0, -20)) +
+                       std::ldexp(1.0, -50) * mag + std::ldexp(1.0, -122);
     double       rlo = lo - eps, rhi = hi + eps;
     if (fa.lo() >= 0 && fb.lo() >= 0) rlo = std::max(rlo, 0.0);
     if (fa.hi() <= 0 && fb.hi() <= 0) rhi = std::min(rhi, 0.0);
+    if (const double M = mixEnvelope(mag); M > 0) {
+        rlo = std::max(rlo, -M);
+        rhi = std::min(rhi, M);
+    }
     return interval(rlo, rhi, std::min({fc.lsb(), fa.lsb(), fb.lsb()}));
 }
 
