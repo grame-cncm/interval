@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include <map>
 #include <numeric>
 #include <algorithm>
 #include <cmath>
@@ -235,10 +236,25 @@ interval interval_algebra::Fir(const interval& x, const std::vector<interval>& c
 namespace {
 
 // the output of the filter of coefficients c (the program's values) on x : [-lo, hi]
+// the gain of a filter depends on its coefficients only : computed once per coefficient
+// vector (an analysis evaluates the same filter at every step of its fixpoints)
+bool cachedFilterGain(const std::vector<double>& c, FilterGain& fg)
+{
+    thread_local std::map<std::vector<double>, std::pair<bool, FilterGain>> cache;
+    auto it = cache.find(c);
+    if (it == cache.end()) {
+        FilterGain g;
+        const bool ok = filterGain(c, g);
+        it            = cache.emplace(c, std::make_pair(ok, g)).first;
+    }
+    fg = it->second.second;
+    return it->second.first;
+}
+
 bool filterOutput(const std::vector<double>& c, const interval& fx, double& lo, double& hi)
 {
     FilterGain fg;
-    if (!filterGain(c, fg)) return false;
+    if (!cachedFilterGain(c, fg)) return false;
     const double L = fg.L;
     // the exact output : y(n) = sum_k h(k) x(n-k), each term between 0 (not yet started)
     // and h(k) times an end of x ; the head by the signs of its computed values, its error
