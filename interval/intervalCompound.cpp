@@ -90,12 +90,13 @@ double rintOf(double v)
 }  // namespace
 
 // The definitions, operation by operation
+// mix(c, a, b) is computed a + c * (b - a), the interpolation : the definition follows the
+// operations of the program
 interval interval_algebra::mixDefinition(const interval& c, const interval& a, const interval& b) const
 {
-    const interval w = Sub(FloatNum(1.0), c);
-    const interval p = Mul(w, a);
-    const interval q = Mul(c, b);
-    return Add(p, q);
+    const interval d = Sub(b, a);
+    const interval p = Mul(c, d);
+    return Add(a, p);
 }
 
 interval interval_algebra::tptDefinition(const interval& x) const
@@ -144,11 +145,14 @@ interval interval_algebra::numericCfrac(const interval& x) const
 
 // Numeric kernel : (1 - c) a + c b with c in [0, 1] lies between a and b. For a fixed c
 // the mix is linear in c, so its extremes are reached at the two ends of c : computed in
-// double (a 2^-50 relative slack covers their own rounding), then widened by 3 rounding
-// errors of the program at any c in between (1 - c, the two products, the sum). The
-// weights are nonnegative : a mix of nonnegative operands stays nonnegative whatever the
-// rounding (and symmetrically). Outside of its premise (c beyond [0, 1], an unbounded
-// operand), the mix is its definition.
+// double (a 2^-50 relative slack covers their own rounding), then widened by the rounding
+// of the program at any c in between. The program computes a + c * (b - a) : the
+// difference, the product and the sum, the first two on values up to twice the largest
+// operand, at most 5 rounding errors of it, 6 with the second-order terms. A mix of
+// nonnegative operands stays nonnegative whatever the rounding (and symmetrically) : b - a
+// is at least -a, so is c * (b - a) for c in [0, 1], each rounding being monotone, and a
+// plus it is at least 0. Outside of its premise (c beyond [0, 1], an unbounded operand),
+// the mix is its definition.
 interval interval_algebra::numericMix(const interval& c, const interval& a, const interval& b) const
 {
     if (c.isEmpty() || a.isEmpty() || b.isEmpty()) return empty();
@@ -164,7 +168,7 @@ interval interval_algebra::numericMix(const interval& c, const interval& a, cons
         hi             = std::max(hi, w * fa.hi() + e * fb.hi());
     }
     const double mag = std::max({std::abs(fa.lo()), std::abs(fa.hi()), std::abs(fb.lo()), std::abs(fb.hi())});
-    const double eps = (3 * unitRoundoff() + std::ldexp(1.0, -50)) * mag + std::ldexp(1.0, -122);
+    const double eps = (6 * unitRoundoff() + std::ldexp(1.0, -50)) * mag + std::ldexp(1.0, -122);
     double       rlo = lo - eps, rhi = hi + eps;
     if (fa.lo() >= 0 && fb.lo() >= 0) rlo = std::max(rlo, 0.0);
     if (fa.hi() <= 0 && fb.hi() <= 0) rhi = std::min(rhi, 0.0);

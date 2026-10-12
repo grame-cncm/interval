@@ -127,7 +127,15 @@ void mixes(int precision)
     expect(!A.Mix(interval(0, 1, -24), interval(0, 1, -24).withInvalid(true), interval(0, 1, -24)).isValid(),
            "a mix keeps an alert" + p);
 
-    // inclusion : the program's (1 - c) a + c b, plain and with each product fused
+    // a case found by search : the interpolation is nearly 4 rounding errors of the largest
+    // operand away from the exact mix, in float
+    if (precision == 1) {
+        const float    a = 0.5153635740280151f, b = -0.5094743371009827f, c = 0.9999904036521912f;
+        const interval R = A.Mix(interval(c, c, -24), interval(a, a, -24), interval(b, b, -24));
+        expect(within(double(a + c * (b - a)), R), "the interpolation a + c (b - a) of the witness is inside the mix" + p);
+    }
+
+    // inclusion : the program's a + c * (b - a), plain and with the product fused
     struct Case {
         interval c, a, b;
     };
@@ -142,10 +150,8 @@ void mixes(int precision)
             ub(k.b.lo(), k.b.hi());
         for (int s = 0; s < 20000; s++) {
             const T c = value<T>(s % 2 ? k.c.hi() : uc(rng)), a = value<T>(ua(rng)), b = value<T>(ub(rng));
-            const T w = T(1) - c;
-            if (!within(double(w * a + c * b), R)) bad++;
-            if (!within(double(std::fma(w, a, c * b)), R)) bad++;
-            if (!within(double(std::fma(c, b, w * a)), R)) bad++;
+            if (!within(double(a + c * (b - a)), R)) bad++;
+            if (!within(double(std::fma(c, b - a, a)), R)) bad++;
         }
     }
     expect(bad == 0, "inclusion of mix, plain and fused" + p +
