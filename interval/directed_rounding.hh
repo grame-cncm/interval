@@ -89,6 +89,13 @@ inline int sumLSB(int a, int b)
 }
 
 double directedBinary(BinaryOp op, double x, double y, Direction direction);
+
+// The exact sum x + y rounded once to nearest, ties to even, in the program's precision
+// (float or double) : what the program computes for the operands x and y. Rounding to
+// nearest is nondecreasing, so for program values u <= x and v <= y the program's
+// u + v is at most nearestSum(x, y) (and symmetrically). Without a nearest host
+// rounding mode, the outward bound in the given direction.
+double nearestSum(double x, double y, Direction fallback);
 double directedUnary(UnaryOp op, double x, Direction direction);
 double directedPi(Direction direction);
 

@@ -18,12 +18,13 @@ int main()
     const double largest = std::numeric_limits<double>::max();
     const double nextOne = std::nextafter(1.0, HUGE_VAL);
 
-    checkExact("double: half-ulp addition is enclosed, not collapsed",
+    // a sum is the program's : 1 + 2^-54 rounds to 1, as the program computes it
+    checkExact("double: a half-ulp addition is the program's sum",
                algebra.Add(interval(1, 1, -24), interval(0x1p-54)),
-               interval(1, nextOne, -54));
-    checkExact("double: subtraction encloses a negative half-ulp",
+               interval(1, 1, -54));
+    checkExact("double: a half-ulp subtraction is the program's difference",
                algebra.Sub(interval(-1, -1, -24), interval(0x1p-54)),
-               interval(-nextOne, -1, -54));
+               interval(-1, -1, -54));
     check("double: a literal stays a singleton", true, algebra.FloatNum(0.1).is(0.1));
     check("double: an integral-looking float literal does not wrap as int32", true,
           algebra.Mul(algebra.FloatNum(65536), algebra.FloatNum(65536)).is(4294967296.0));
@@ -148,8 +149,8 @@ int main()
     affine_algebra affine(10);
     const AffItv affineSum = affine.Add(fromItv(interval(1, 1, -24)),
                                         fromItv(interval(0x1p-54)));
-    check("double: affine addition does not collapse a half-ulp", true,
-          affineSum.a0 == 1 && affineSum.b0 == nextOne);
+    check("double: an affine addition of constants is the program's sum", true,
+          affineSum.a0 == 1 && affineSum.b0 == 1);
     const AffItv infiniteJoin = ajoin({-HUGE_VAL, 0, 0, 0, -24},
                                       {0, 0, HUGE_VAL, 0, -24}, 10);
     check("double: affine join keeps both unbounded sides", true,
@@ -174,6 +175,38 @@ int main()
     }
     std::fesetround(saved);
 #endif
+    // nearestSum : the sum the program computes, rounded once to nearest
+    {
+        programPrecision() = 1;
+        // the step of a counter : 1 + 2^24 rounds to 2^24 (ties to even), where the outward
+        // bound was 2^24 + 2
+        const interval step = algebra.Add(interval(1, 1, -24), interval(0, 0x1p24, -24));
+        check("single: a counter step 1 + [0, 2^24] is [1, 2^24]", true, step.lo() == 1 && step.hi() == 0x1p24);
+        // r = 1 + 2^-24 is the midpoint of the floats 1 and 1 + 2^-23 : the residual of the
+        // binary64 sum decides, ties to even without one
+        const double mid = 1 + 0x1p-24;
+        check("single: above the midpoint, the sum rounds up", true,
+              detail::nearestSum(mid, 0x1p-60, detail::Direction::Up) == 1 + 0x1p-23);
+        check("single: below the midpoint, the sum rounds down", true,
+              detail::nearestSum(mid, -0x1p-60, detail::Direction::Up) == 1);
+        check("single: at the midpoint, the sum rounds to even", true,
+              detail::nearestSum(mid, 0, detail::Direction::Up) == 1);
+        // random floats : nearestSum is the float sum
+        unsigned s = 12345;
+        int      bad = 0;
+        for (int k = 0; k < 200000; k++) {
+            s = s * 1103515245u + 12345u;
+            const float a = std::ldexp(float(int(s >> 9) - (1 << 22)), int(s % 40) - 30);
+            s = s * 1103515245u + 12345u;
+            const float b = std::ldexp(float(int(s >> 9) - (1 << 22)), int(s % 40) - 30);
+            volatile float r = a + b;
+            if (detail::nearestSum(a, b, detail::Direction::Up) != double(r)) bad++;
+        }
+        check("single: nearestSum of floats is their float sum", true, bad == 0);
+        programPrecision() = 2;
+        check("double: nearestSum is the double sum", true,
+              detail::nearestSum(0.1, 0.2, detail::Direction::Up) == 0.1 + 0.2);
+    }
     libmCompensation() = true;
     return reportCheckResults();
 }

@@ -36,8 +36,11 @@ static double addint(double x, double y)
     return (int)x + (int)y;
 }
 
-// Numeric kernel: enclose addition; float/double floating bounds round outward at each
-// endpoint, while the existing int32 wrapping and other precision paths remain.
+// Numeric kernel: the values of the program's addition. Float/double floating bounds are
+// the program's own sums of the operands' bounds, rounded to nearest (nearestSum) : the
+// rounding is nondecreasing, so no program sum lies beyond them. A product the program may
+// fuse into the sum keeps an outward bound (Mul), above both its exact and its rounded
+// value. The existing int32 wrapping and other precision paths remain.
 interval interval_algebra::numericAdd(const interval& xIn, const interval& yIn) const
 {
     const auto [x, y] = detail::int32Operands(xIn, yIn);
@@ -78,8 +81,8 @@ interval interval_algebra::numericAdd(const interval& xIn, const interval& yIn) 
 
     if (detail::usesNativeBounds()) {
         const interval a = detail::floatingOperand(x), b = detail::floatingOperand(y);
-        const double lo = detail::directedBinary(detail::BinaryOp::Add, a.lo(), b.lo(), detail::Direction::Down);
-        const double hi = detail::directedBinary(detail::BinaryOp::Add, a.hi(), b.hi(), detail::Direction::Up);
+        const double lo = detail::nearestSum(a.lo(), b.lo(), detail::Direction::Down);
+        const double hi = detail::nearestSum(a.hi(), b.hi(), detail::Direction::Up);
         // An indeterminate infinite corner must not erase numeric interior values.
         if (std::isnan(lo) || std::isnan(hi)) return {-HUGE_VAL, HUGE_VAL, -24};
         return {lo, hi, detail::floatingLSB(std::min(x.lsb(), y.lsb()))};

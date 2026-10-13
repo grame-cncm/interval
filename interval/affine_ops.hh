@@ -144,11 +144,14 @@ class AffineOps : public Base {
 
     //--- the affine-preserving (linear) regime ----------------------------------------
     // Numeric kernel: coefficient-wise enclosure of x+y over a nonnegative horizon.
-    // Double coefficients round outward; float operations use a constant hull
-    // through the ordinary oracle because rounding need not preserve affinity.
+    // Double coefficients round outward (they are not values of the program); float
+    // operations use a constant hull through the ordinary oracle because rounding need not
+    // preserve affinity, and so do two constant corridors, whose bounds are values.
     AffItv numericAdd(const AffItv& x, const AffItv& y) const
     {
         if (x.isEmpty() || y.isEmpty()) return aempty();
+        if (x.lsb < 0 && y.lsb < 0 && x.isConst() && y.isConst())
+            return c2(x, y, [this](const interval& a, const interval& b) { return fItv.Add(a, b); });
         // Binary32 rounding is a staircase, not an affine function of time.
         // Collapse float corridors over the horizon and use the outward oracle.
         // Mixed operations must also recover any wrapped integer hull before its
@@ -170,12 +173,13 @@ class AffineOps : public Base {
         return {x.a0 + y.a0, x.a1 + y.a1, x.b0 + y.b0, x.b1 + y.b1,
                 std::min(x.lsb, y.lsb)};
     }
-    // Numeric kernel: coefficient-wise enclosure of x-y over a nonnegative horizon.
-    // Double coefficients round outward; float operations use a constant hull
-    // through the ordinary oracle because rounding need not preserve affinity.
+    // Numeric kernel: coefficient-wise enclosure of x-y over a nonnegative horizon (see
+    // numericAdd for the constant corridors).
     AffItv numericSub(const AffItv& x, const AffItv& y) const
     {
         if (x.isEmpty() || y.isEmpty()) return aempty();
+        if (x.lsb < 0 && y.lsb < 0 && x.isConst() && y.isConst())
+            return c2(x, y, [this](const interval& a, const interval& b) { return fItv.Sub(a, b); });
         if ((x.lsb < 0 || y.lsb < 0) &&
             (programPrecision() == 1 || integerMayWrap(x) || integerMayWrap(y)))
             return c2(x, y, [this](const interval& a, const interval& b) { return fItv.Sub(a, b); });

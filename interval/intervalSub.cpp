@@ -31,8 +31,9 @@ static double sub(double a, double b)
     return a - b;
 }
 
-// Numeric kernel: enclose subtraction; float/double floating bounds round outward at each
-// endpoint, while the existing int32 wrapping and other precision paths remain.
+// Numeric kernel: the values of the program's subtraction, its bounds rounded to nearest
+// as the program rounds them (see numericAdd). The existing int32 wrapping and other
+// precision paths remain.
 interval interval_algebra::numericSub(const interval& xIn, const interval& yIn) const
 {
     const auto [x, y] = detail::int32Operands(xIn, yIn);
@@ -65,8 +66,8 @@ interval interval_algebra::numericSub(const interval& xIn, const interval& yIn) 
 
     if (detail::usesNativeBounds()) {
         const interval a = detail::floatingOperand(x), b = detail::floatingOperand(y);
-        const double lo = detail::directedBinary(detail::BinaryOp::Sub, a.lo(), b.hi(), detail::Direction::Down);
-        const double hi = detail::directedBinary(detail::BinaryOp::Sub, a.hi(), b.lo(), detail::Direction::Up);
+        const double lo = detail::nearestSum(a.lo(), -b.hi(), detail::Direction::Down);
+        const double hi = detail::nearestSum(a.hi(), -b.lo(), detail::Direction::Up);
         // An indeterminate infinite corner must not erase numeric interior values.
         if (std::isnan(lo) || std::isnan(hi)) return {-HUGE_VAL, HUGE_VAL, -24};
         return {lo, hi, detail::floatingLSB(std::min(x.lsb(), y.lsb()))};

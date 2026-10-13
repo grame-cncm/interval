@@ -206,9 +206,21 @@ retain their int32 wrapping contract.
 An injected literal is already a known machine value: `FloatNum(0.1)` remains a
 singleton. `FloatNum` preserves the floating nature of integral-looking literals,
 so `FloatNum(65536) * FloatNum(65536)` does not take the int32 path. Exact
-operations such as `0.5 * 0.25` remain singletons. An inexact operation such as
-`1 + 2^-54` is enclosed by `[1, nextafter(1, +inf)]`; a rounded equality of
-endpoints must not create a false constant. Exact transcendental identities
+operations such as `0.5 * 0.25` remain singletons. An inexact product such as
+`(1 + 2^-52) * (1 + 2^-52)` is enclosed by its two neighbouring doubles: the
+program may fuse it into a sum and add the exact product.
+
+Additions and subtractions are the program's own: each bound is the sum of the
+operands' bounds rounded once to nearest, ties to even, in the program's
+precision (`detail::nearestSum`). Rounding to nearest is nondecreasing, so no
+sum the program computes lies beyond these bounds, and `1 + 2^-54` is the point
+`1`, the value the program computes. A product the program may fuse into the sum
+keeps its outward bound, above both its exact and its rounded value, so that the
+sum bounds both computations. This is what bounds a recursion whose computation
+stops growing by rounding: a counter `y = 1 + y'` in float stops at `2^24`,
+where `2^24 + 1` rounds to `2^24`; an outward bound `2^24 + 2` would not map the
+seed `[0, 2^24]` into itself. Affine corridors (`a0 + a1 t`) keep outward
+coefficients: they are not values of the program. Exact transcendental identities
 such as `sin(0)`, `exp(0)` and `log(1)` also remain points in `*Bounds`.
 
 This is the first step towards a reliable computational analysis. It does not
@@ -223,9 +235,9 @@ Single precision now uses the same native reference kernel: enclose each
 calculation in binary64, then take the greatest binary32 value below its lower
 bound and the least binary32 value above its upper bound. This also applies to
 computed singleton intervals, subnormal results, overflow, and integral-looking
-float values above `2^24`. Outward composition includes both separate rounding
-and FMA contraction, under a contract that forbids reassociation and preserves
-gradual underflow. Explicit `FloatNum` literals are rounded once and remain
+float values above `2^24`. The composition includes both separate rounding
+and FMA contraction (products outward, sums to nearest), under a contract that
+forbids reassociation and preserves gradual underflow. Explicit `FloatNum` literals are rounded once and remain
 points; compiler-folded values must be injected through this literal API.
 `FloatCast` describes a known monotone conversion. Mixed arithmetic converts its
 integer operands before floating evaluation. Float zero and integral-valued

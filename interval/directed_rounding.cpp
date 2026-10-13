@@ -207,6 +207,27 @@ double directedBinary(BinaryOp op, double x, double y, Direction direction)
     return adjusted(r, y < 0 ? -residual : residual, direction);
 }
 
+// Internal kernel: TwoSum gives the exact sum r + error, r = x + y rounded to nearest in
+// binary64. In double, r is the program's sum. In float, rounding r to binary32 rounds
+// the exact sum the same way, unless r lies exactly at the midpoint of two floats : the
+// sign of the residual then decides (ties to even when there is none, as the cast does).
+double nearestSum(double x, double y, Direction fallback)
+{
+    const double r = x + y;
+    if (!std::isfinite(x) || !std::isfinite(y) || std::isnan(r)) return r;
+    if (!nearestMode()) return directedBinary(BinaryOp::Add, x, y, fallback);
+    if (programPrecision() != 1 || !std::isfinite(r)) return programPrecision() == 1 ? double(float(r)) : r;
+    const double z     = r - x;
+    const double error = (x - (r - z)) + (y - z);
+    const float  f     = static_cast<float>(r);
+    if (error == 0 || double(f) == r || !std::isfinite(f)) return f;
+    const float  below = double(f) < r ? f : std::nextafter(f, -HUGE_VALF);
+    const float  above = std::nextafter(below, HUGE_VALF);
+    const double mid   = (double(below) + double(above)) / 2;
+    if (r != mid) return f;
+    return error > 0 ? above : below;
+}
+
 // Internal kernel: sqrt is correctly rounded; an exact significand comparison
 // with r*r determines the outward neighbour without trusting an underflowed FMA.
 double directedUnary(UnaryOp op, double x, Direction direction)

@@ -228,8 +228,8 @@ int main()
         programPrecision() = 1;
         check("single: 0.1 is the float 0.1f", true, interval(0.1).lo() == double(0.1f));
         check("single: an explicit literal stays a point", true, algebra.FloatNum(0.1).is(0.1f));
-        check("single: a computed point encloses its rounding error", true,
-              !algebra.Add(interval(0.1), interval(0.2)).isconst());
+        check("single: a computed point is the program's sum", true,
+              algebra.Add(interval(0.1), interval(0.2)).is(double(0.1f + 0.2f)));
         check("single: 0.1 + 0.2 contains the float sum the program computes", true,
               algebra.Add(interval(0.1), interval(0.2)).has(double(0.1f + 0.2f)));
         check("single: an upper bound between two floats rounds upward", true,
