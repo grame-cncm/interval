@@ -373,6 +373,27 @@ void irms(int precision)
                          (bad ? " -- " + std::to_string(bad) + " values outside" : ""));
 }
 
+// Bpf(x, t, r) : the regions that x reaches, the last one for a NaN x
+void bpfs()
+{
+    programPrecision() = 1;
+    const interval_algebra      A;
+    const std::vector<interval> t{interval(10, 10, -24), interval(20, 20, -24)};
+    const std::vector<interval> r{interval(0, 0, -24), interval(1, 5, -24), interval(-3, -2, -24)};
+    const interval              b1 = A.Bpf(interval(12, 15, -24), t, r);
+    expect(b1.isValid() && b1.lo() == 1 && b1.hi() == 5, "bpf : x within one region reads that region only");
+    const interval b2 = A.Bpf(interval(5, 20, -24), t, r);
+    expect(b2.lo() == -3 && b2.hi() == 5, "bpf : x reaching a threshold reads the region above it");
+    const interval b3 = A.Bpf(interval(5, 19.5, -24), t, r);
+    expect(b3.lo() == 0 && b3.hi() == 5, "bpf : x below the last threshold does not read the last region");
+    const interval b4 = A.Bpf(interval(12, 15, -24).withInvalid(true), t, r);
+    expect(b4.lo() == -3 && b4.hi() == 5, "bpf : a NaN x reads the last region");
+    std::vector<interval> r2 = r;
+    r2[2]                    = r2[2].withInvalid(true);
+    expect(A.Bpf(interval(12, 15, -24), t, r2).isValid(), "bpf : an unreached invalid region leaves the result valid");
+    expect(!A.Bpf(interval(12, 25, -24), t, r2).isValid(), "bpf : a reached invalid region makes it invalid");
+}
+
 void affine()
 {
     programPrecision()        = 2;
@@ -400,6 +421,7 @@ int main()
     tpts<double>(2);
     irms<float>(1);
     irms<double>(2);
+    bpfs();
     affine();
     std::cout << (gFailed ? "FAILED" : "PASSED") << " (" << gFailed << " failure(s))\n";
     return gFailed ? 1 : 0;
