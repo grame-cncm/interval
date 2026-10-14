@@ -183,6 +183,11 @@ void mixes(int precision)
         expect(R.lo() >= -1 && R.hi() <= 1, "a smoother maps [-1, 1] into itself" + p);
         const interval Q = A.Mix(interval(0, 1, -24), interval(-12, 12, -24), interval(-12, 12, -24));
         expect(Q.lo() >= -16 && Q.hi() <= 16, "a mix of [-12, 12] stays in [-16, 16]" + p);
+        // a slow smoother of a target in [0, 384000] : the state stays within itself and the
+        // target, the margins of a small weight no longer accumulate
+        const interval S = A.Mix(interval(44.1 / 192000, 0.882, -24), interval(0, 384000.375, -24),
+                                 interval(0, 384000, -24));
+        expect(S.lo() >= 0 && S.hi() <= 384000.375, "a slow smoother stays within its state and its target" + p);
     }
 
     // inclusion : the program's interpolation, plain and with the product fused
@@ -195,7 +200,9 @@ void mixes(int precision)
                           {interval(0.2, 0.3, -24), interval(-1e6, 1e6, -24), interval(5, 6, -24)},
                           {interval(0.5, 1, -24), interval(-12, 12, -24), interval(-12, 12, -24)},
                           {interval(0, 0.9999999, -24), interval(-1, 1, -24), interval(-1, 1, -24)},
-                          {interval(0.9999, 0.99999994, -24), interval(-1, 1, -24), interval(-1, 1, -24)}};
+                          {interval(0.9999, 0.99999994, -24), interval(-1, 1, -24), interval(-1, 1, -24)},
+                          {interval(44.1 / 192000, 0.882, -24), interval(0, 384000.375, -24), interval(0, 384000, -24)},
+                          {interval(0.6, 0.99, -24), interval(-5, 5, -24), interval(-100, 3, -24)}};
     int bad = 0;
     for (const Case& k : cases) {
         const interval R = A.Mix(k.c, k.a, k.b);

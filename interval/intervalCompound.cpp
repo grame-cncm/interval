@@ -213,6 +213,24 @@ interval interval_algebra::numericMix(const interval& c, const interval& a, cons
         rlo = std::max(rlo, -M);
         rhi = std::min(rhi, M);
     }
+    // A mix moves its base toward the other operand and never past it, but for the
+    // rounding. From a : when b <= a, b - a, then c (b - a), rounded to nearest, stay at
+    // most 0, and so does the result at most a ; when a < b, the exact a + c (b - a) is at
+    // most b, and the roundings of the difference, of the step and of the sum add less
+    // than 6 u mag (the difference is at most 2 mag, c at most 1). So the result lies in
+    // [min(a.lo, b.lo - s), max(a.hi, b.hi + s)], s = 8 u mag ; from b with the weight
+    // 1 - c, the same with a and b exchanged. A recursive smoother y = mix(c, y', T) then
+    // stays within its state and its target whatever its weight : the margins of the
+    // two-ends formula above, regained at the pace of c, no longer accumulate for a
+    // slow smoother.
+    {
+        const double sm   = 8 * u * mag + std::ldexp(1.0, -122);
+        const bool   from = mixFromB(fc);
+        const interval& base = from ? fb : fa;
+        const interval& goal = from ? fa : fb;
+        rlo = std::max(rlo, std::min(base.lo(), goal.lo() - sm));
+        rhi = std::min(rhi, std::max(base.hi(), goal.hi() + sm));
+    }
     return interval(rlo, rhi, std::min({fc.lsb(), fa.lsb(), fb.lsb()}));
 }
 
