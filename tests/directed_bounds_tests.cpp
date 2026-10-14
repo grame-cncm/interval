@@ -133,6 +133,9 @@ int main()
           algebra.Fmod(interval(3), interval(2)).is(1));
     check("double: fmod cannot lose a tiny result in a huge quotient", true,
           algebra.Fmod(interval(1e100, 1e101), interval(tiny, 2 * tiny)).has(tiny));
+    check("double: fmod of [0, 100] by 1 is below 1, as frac", true,
+          algebra.Fmod(interval(0, 100), interval(1)).lo() == 0 &&
+              algebra.Fmod(interval(0, 100), interval(1)).hi() == std::nextafter(1.0, 0.0));
     check("double: remainder half-divisor underflow rounds outward", true,
           algebra.Remainder(interval(-tiny, tiny), interval(tiny, tiny, -24)).has(tiny));
 
@@ -203,6 +206,10 @@ int main()
             if (detail::nearestSum(a, b, detail::Direction::Up) != double(r)) bad++;
         }
         check("single: nearestSum of floats is their float sum", true, bad == 0);
+        check("single: fmod of [0, 100] by 1 is below 1, as frac", true,
+              algebra.Fmod(interval(0, 100, -24), interval(1, 1, -24)).hi() == double(std::nextafter(1.0f, 0.0f)));
+        check("single: fmod of [0, 0.5] by 1 is [0, 0.5]", true,
+              algebra.Fmod(interval(0, 0.5, -24), interval(1, 1, -24)).hi() == 0.5);
         programPrecision() = 2;
         check("double: nearestSum is the double sum", true,
               detail::nearestSum(0.1, 0.2, detail::Direction::Up) == 0.1 + 0.2);
