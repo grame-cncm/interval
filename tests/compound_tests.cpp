@@ -1,6 +1,6 @@
 // Copyright 2026 Yann Orlarey, Stéphane Letz. Apache-2.0 (see LICENSE).
 //
-// The compound operations Frac, Cfrac, Mix and Tpt : precision of the bounds, inclusion of
+// The compound operations Frac, Cfrac, Mix, Tpt and the recursive mix Irm : precision of the bounds, inclusion of
 // the values a program computes (in float and in double, with and without a fused
 // multiply-add of the product that computes the operand), and validity.
 
@@ -306,6 +306,73 @@ void phases(int precision)
     expect(bad == 0, "inclusion of phase" + p + (bad ? " -- " + std::to_string(bad) + " values outside" : ""));
 }
 
+// Irm(x, c) : y(n) = mix(c, x(n), y(n - 1)), y(-1) = 0, the program computing the mix as
+// an interpolation (mixFromB on the interval of c), plain or with the product fused
+template <typename T>
+void irms(int precision)
+{
+    programPrecision() = precision;
+    const std::string      p = precision == 1 ? " (float)" : " (double)";
+    const interval_algebra A;
+    std::mt19937           rng(4321);
+    const double           u = precision == 1 ? std::ldexp(1.0, -24) : std::ldexp(1.0, -53);
+
+    const interval s1 = A.Irm(interval(0, 384000, -24), interval(0.99, 0.9999, -24));
+    expect(s1.isValid() && s1.lo() == 0 && s1.hi() >= 384000 && s1.hi() < 384000 * 1.01,
+           "a slow smoother of [0, 384000] stays within 1 % of its target" + p);
+    const interval s2 = A.Irm(interval(-1, 1, -24), interval(0, 1, -24));
+    expect(s2.isValid() && s2.lo() >= -1 && s2.hi() <= 1, "a smoother of [-1, 1] stays in [-1, 1], its pole up to 1" + p);
+    const interval s3 = A.Irm(interval(-3, -2, -24), interval(0.5, 0.9, -24));
+    expect(s3.isValid() && s3.hi() < 0 && s3.lo() <= -3 && s3.lo() > -3.1, "a smoother of [-3, -2] stays in [-3, 0[" + p);
+    const interval s6 = A.Irm(interval(1, 20, -24), interval(0.9, 0.99, -24));
+    expect(s6.isValid() && s6.lo() > 0 && s6.hi() < 20.01, "a smoother of [1, 20] is positive : its samples, not its initial state" + p);
+    const interval s4 = A.Irm(interval(0, 1, -24), interval(0, 1.5, -24));
+    expect(!s4.isValid() && !std::isfinite(s4.hi()), "a pole beyond 1 : anything" + p);
+    const interval s5 = A.Irm(interval(0, HUGE_VAL, -24), interval(0.5, 0.9, -24));
+    expect(!s5.isValid(), "an unbounded input : anything" + p);
+    expect(!A.Irm(interval(0, 1, -24).withInvalid(true), interval(0.5, 0.9, -24)).isValid(), "Irm keeps an alert" + p);
+
+    // the two forms of the interpolation, whichever a code generator chooses : from the
+    // state with the weight 1 - c of x (computed, or exact when the program holds it), from
+    // x with the pole c
+    auto program = [](int form, T c, T a, T b, bool fused) {
+        if (form == 0) {
+            const T w = T(1) - c;
+            return fused ? T(std::fma(w, a - b, b)) : T(b + w * (a - b));
+        }
+        return fused ? T(std::fma(c, b - a, a)) : T(a + c * (b - a));
+    };
+    struct Case {
+        interval x, c;
+    };
+    const Case cases[] = {{interval(0, 384000, -24), interval(0.99, 0.9999, -24)},
+                          {interval(-1, 1, -24), interval(0, 1, -24)},
+                          {interval(-1, 1, -24), interval(1 - 64 * u, 1 - u, -24)},
+                          {interval(5, 6, -24), interval(0, 0.4, -24)},
+                          {interval(-1e6, 3, -24), interval(0.3, 0.7, -24)},
+                          {interval(48000, 48000, -24), interval(0.9999, 0.99999, -24)}};
+    int bad = 0;
+    for (const Case& k : cases) {
+        const interval                         R = A.Irm(k.x, k.c);
+        std::uniform_real_distribution<double> ux(k.x.lo(), k.x.hi()), uc(k.c.lo(), k.c.hi());
+        for (int form : {0, 1}) {
+            for (bool fused : {false, true}) {
+                T y = 0;
+                T x = value<T>(k.x.hi());
+                for (int n = 0; n < 100000; n++) {
+                    // held targets, extremes first, then random ones
+                    if (n % 5000 == 0) x = value<T>(n == 0 ? k.x.hi() : n == 5000 ? k.x.lo() : ux(rng));
+                    const T c = value<T>(n % 3 ? uc(rng) : k.c.hi());
+                    y         = program(form, c, x, y, fused);
+                    if (!within(double(y), R)) bad++;
+                }
+            }
+        }
+    }
+    expect(bad == 0, "inclusion of the recursive mix, plain and fused" + p +
+                         (bad ? " -- " + std::to_string(bad) + " values outside" : ""));
+}
+
 void affine()
 {
     programPrecision()        = 2;
@@ -331,6 +398,8 @@ int main()
     mixes<double>(2);
     tpts<float>(1);
     tpts<double>(2);
+    irms<float>(1);
+    irms<double>(2);
     affine();
     std::cout << (gFailed ? "FAILED" : "PASSED") << " (" << gFailed << " failure(s))\n";
     return gFailed ? 1 : 0;

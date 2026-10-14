@@ -101,3 +101,39 @@ smoother of the SAM echo examples, which are accepted in float.
 - a smoother of weight `[0.4, 1 - 2u]` maps `[-1, 1]` into itself;
 - a mix of operands in `[-12, 12]` stays in `[-16, 16]`;
 - the interval contains the computed value on the cases of the rounding margin.
+
+## The recursive mix `Irm`
+
+`Irm(x, c)` is the signal `y` with `y(n) = mix(c(n), x(n), y(n - 1))` and
+`y(-1) = 0`: a smoother of `x` whose pole is `c`. Its interval is built from an
+*invariant*: an interval `Y` that holds `0` and such that `Mix(c, x, Y)` lies in
+`Y`. By induction every `y(n)` then lies in `Y`, rounding included. The rounding
+is the one of either form of the interpolation, from `x` with the pole `c` or
+from the state with the weight `1 - c` of `x`: a code generator may choose one or
+the other (the weight of `x` is sometimes exact in the program, the pole computed
+from it is not). The samples are then mixes of `x` and of a state in `Y`: the
+result is `Y` met with `Mix(c, x, Y)`, which leaves out the initial state `0` (a
+smoother of a positive `x` is positive).
+
+Two invariants are tried, and their intersection, itself an invariant (the mix of
+intervals is monotone), is the result:
+
+1. **The hull of `x` and `0`, with a margin.** The exact mix of a value of `Y` and
+   a value of `x` moves a bound of `Y` inwards by `1 - c` times its distance to
+   `x`. That pays for the rounding of the mix once the margin reaches about one
+   rounding divided by `1 - c`. The margin starts at one rounding of the result
+   and doubles until the mix maps `Y` into itself; a bisection then narrows it to
+   within an eighth of the last doubling. A bound at `0` that `x` does
+   not cross needs no margin (the sign of the mix).
+2. **The power-of-two envelope** of `x` and `0`, which needs no margin and holds
+   for a pole up to `1`.
+
+| `x` | `c` | `Irm(x, c)` |
+| :-- | :-- | :-- |
+| `[0, 384000]` | `[0.99, 0.9999]` | `[0, 384000]` plus a margin below 1 % |
+| `[-1, 1]` | `[0, 1]` | `[-1, 1]` |
+| `[-3, -2]` | `[0.5, 0.9]` | about `[-3, -0.2]`, the lower bound with a small margin |
+| `[1, 20]` | `[0.9, 0.99]` | about `[0.01, 20]` |
+
+A pole that may leave `[0, 1]` (a recursion that may diverge) or an unbounded `x`
+gives anything, NaN included.
