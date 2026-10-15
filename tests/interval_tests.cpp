@@ -177,6 +177,18 @@ int main()
         checkExact("int cast of an in-range float truncates exactly",
                    ia.IntCast(interval(-3.8, 4.9, -24)), interval(-3, 4, 0));
 
+        // the truncation of a moving corridor : a constant line is truncated, a moving
+        // line gets one unit of slack only on the side the truncation can move it
+        const AffItv up = aa.IntCast(AffItv{0.5, 0, 0.5, 0.5, -24});  // [0.5, 0.5 + t/2]
+        check("affine: int cast of a rising nonnegative corridor", true,
+              up.a0 == 0 && up.a1 == 0 && up.b0 == 0.5 && up.b1 == 0.5);
+        const AffItv down = aa.IntCast(AffItv{-0.5, -0.5, -0.5, 0, -24});  // [-0.5 - t/2, -0.5]
+        check("affine: int cast of a falling nonpositive corridor", true,
+              down.a0 == -0.5 && down.a1 == -0.5 && down.b0 == 0 && down.b1 == 0);
+        const AffItv cross = aa.IntCast(AffItv{-1000.25, 0, -1000.25, 2, -24});  // crosses 0
+        check("affine: int cast of a corridor crossing 0", true,
+              cross.a0 == -1000 && cross.b0 == -999.25 && cross.b1 == 2);
+
         // widening proposes the observed per-round rate, then escalates
         const AffItv w1 = awiden({0, 0, 8, 0, 0}, {0, 0, 9, 0, 0}, T);
         check("affine: widening proposes the rate", true, w1.b1 == 1 && w1.b0 == 9);
