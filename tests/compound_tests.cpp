@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <string>
 
@@ -332,13 +333,21 @@ void irms(int precision)
     expect(!s5.isValid(), "an unbounded input : anything" + p);
     expect(!A.Irm(interval(0, 1, -24).withInvalid(true), interval(0.5, 0.9, -24)).isValid(), "Irm keeps an alert" + p);
 
-    // the two forms of the interpolation, whichever a code generator chooses : from the
-    // state with the weight 1 - c of x (computed, or exact when the program holds it), from
-    // x with the pole c
+    // the forms a code generator may choose : the interpolation from the state with the
+    // weight 1 - c of x (computed, or exact when the program holds it), from x with the pole
+    // c ; the weighted sum w x + c y' of a slow smoother, its weight w = 1 - c computed, or
+    // its pole c = 1 - w computed from the weight the program holds
     auto program = [](int form, T c, T a, T b, bool fused) {
         if (form == 0) {
             const T w = T(1) - c;
             return fused ? T(std::fma(w, a - b, b)) : T(b + w * (a - b));
+        }
+        if (form == 2 || form == 3) {
+            // form 3 : the program holds w, near 1 - c, and computes its pole from it
+            const T w  = form == 2 ? T(1) - c : T(1.0 - double(c));
+            const T pc = form == 2 ? c : T(1) - w;
+            const T wa = w * a;
+            return fused ? T(std::fma(pc, b, wa)) : T(wa + pc * b);
         }
         return fused ? T(std::fma(c, b - a, a)) : T(a + c * (b - a));
     };
@@ -355,7 +364,7 @@ void irms(int precision)
     for (const Case& k : cases) {
         const interval                         R = A.Irm(k.x, k.c);
         std::uniform_real_distribution<double> ux(k.x.lo(), k.x.hi()), uc(k.c.lo(), k.c.hi());
-        for (int form : {0, 1}) {
+        for (int form : {0, 1, 2, 3}) {
             for (bool fused : {false, true}) {
                 T y = 0;
                 T x = value<T>(k.x.hi());
