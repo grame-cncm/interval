@@ -362,6 +362,23 @@ void structuralTests(int precision)
     check(p + "selector invalidity cannot be dropped", true,
           a.Select2(alert, lo, hi).mayBeInvalid() &&
           affine.Select2(fromItv(alert), fromItv(lo), fromItv(hi)).mayBeInvalid);
+    {
+        // a selector of one value chooses its branch, the program converting it to an
+        // integer ; a selector of several values joins the two
+        auto same = [](const interval& x, const interval& y) {
+            return x.lo() == y.lo() && x.hi() == y.hi() && !x.mayBeInvalid();
+        };
+        auto aff = [&](const interval& s) {
+            return toItv(affine.Select2(fromItv(s), fromItv(lo), fromItv(hi)), 32);
+        };
+        check(p + "a selector of one value chooses its branch", true,
+              same(a.Select2(a.IntNum(0), lo, hi), lo) && same(a.Select2(a.IntNum(3), lo, hi), hi) &&
+              same(a.Select2(a.FloatNum(0.5), lo, hi), lo) && same(aff(a.IntNum(0)), lo) &&
+              same(aff(a.IntNum(-1)), hi));
+        check(p + "a selector of several values joins its branches", true,
+              same(a.Select2(interval(0, 1, 0), lo, hi), interval(0, 2)) &&
+              same(aff(interval(0, 1, 0)), interval(0, 2)));
+    }
     check(p + "waveform alert in any sample survives", true,
           a.Waveform({lo, empty().withInvalid(), hi}).mayBeInvalid() &&
           affine.Waveform({fromItv(lo), fromItv(alert)}).mayBeInvalid);
