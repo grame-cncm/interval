@@ -379,6 +379,24 @@ void structuralTests(int precision)
               same(a.Select2(interval(0, 1, 0), lo, hi), interval(0, 2)) &&
               same(aff(interval(0, 1, 0)), interval(0, 2)));
     }
+    {
+        // an empty operand that may be invalid keeps its alert in the compound rules :
+        // an empty value is neutral in a union, an operand always NaN would be lost
+        const interval e = empty().withInvalid();
+        const AffItv   ae = fromItv(e), alo = fromItv(lo), ahi = fromItv(hi);
+        check(p + "an invalid empty operand keeps its alert (intervals)", true,
+              a.Iir(e, {lo}).mayBeInvalid() && a.Iir(lo, {e}).mayBeInvalid() &&
+              a.Irm(e, lo).mayBeInvalid() && a.Tpt(e).mayBeInvalid() &&
+              a.Phase(e, hi).mayBeInvalid() && a.Bpf(e, {lo}, {lo, hi}).mayBeInvalid() &&
+              a.Mix(e, lo, hi).mayBeInvalid());
+        check(p + "an invalid empty operand keeps its alert (corridors)", true,
+              affine.Iir(ae, {alo}).mayBeInvalid && affine.Irm(ae, alo).mayBeInvalid &&
+              affine.Mix(ae, alo, ahi).mayBeInvalid && affine.Phase(ae, ahi).mayBeInvalid &&
+              affine.Bpf(ae, {alo}, {alo, ahi}).mayBeInvalid && affine.Tpt(ae).mayBeInvalid);
+        check(p + "a malformed break-point function bounds nothing", true,
+              a.Bpf(lo, {lo}, {lo}).mayBeInvalid() && !a.Bpf(lo, {lo}, {lo}).isBounded() &&
+              affine.Bpf(alo, {alo}, {alo}).mayBeInvalid);
+    }
     check(p + "waveform alert in any sample survives", true,
           a.Waveform({lo, empty().withInvalid(), hi}).mayBeInvalid() &&
           affine.Waveform({fromItv(lo), fromItv(alert)}).mayBeInvalid);
