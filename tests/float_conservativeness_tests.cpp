@@ -127,6 +127,65 @@ Witness largeSine(const interval_algebra& algebra)
     return sineAt(algebra, 1.0e20f, "sine-large");
 }
 
+// x^8 as the backends compute it : 7 products, left to right (powprim.hh). The chain
+// sits 4.4 float ulps above the power at this x, outside a 2-ulp libm margin.
+float powerChain(float x, int n)
+{
+    volatile float r = x;
+    for (int k = 1; k < n; k++) r = r * x;
+    return r;
+}
+double powerChain(double x, int n)
+{
+    volatile double r = x;
+    for (int k = 1; k < n; k++) r = r * x;
+    return r;
+}
+
+Witness powerChainWitness(const interval_algebra& algebra)
+{
+    volatile float  x      = 1.0642072f;
+    const float     result = powerChain(float(x), 8);
+    const interval  domain = floatDomain(x, x);
+    return {"power-chain", algebra.Pow(domain, interval(8.0)), double(result),
+            domain.has(x) && std::isfinite(result)};
+}
+
+// Every power by an integer 2..8 that the backends expand, over a sweep of the float
+// (precision 1) or double (precision 2) arguments : regularly spaced in [1, 2), and
+// small values whose powers reach the subnormals. Returns the number of exclusions.
+template <typename T>
+int powerChainSweep(int precision)
+{
+    const int saved            = itv::programPrecision();
+    itv::programPrecision()    = precision;
+    const interval_algebra algebra;
+    int                    excluded = 0, checked = 0;
+    auto check = [&](T x) {
+        for (int n = 2; n <= 8; n++) {
+            const T        r = powerChain(x, n);
+            const interval p = algebra.Pow(interval(double(x), double(x), precision == 1 ? -24 : -53),
+                                           interval(double(n)));
+            checked++;
+            if (!p.has(double(r))) {
+                if (excluded < 3) {
+                    std::cerr << "  power chain excluded : x=" << double(x) << " n=" << n
+                              << " chain=" << double(r) << " interval=[" << p.lo() << ", "
+                              << p.hi() << "]\n";
+                }
+                excluded++;
+            }
+        }
+    };
+    // 2^18 arguments regularly spaced in [1, 2) (one float in 32), then small ones
+    for (int k = 0; k < (1 << 18); k++) check(T(1) + T(k) / T(1 << 18));
+    for (T x = T(precision == 1 ? 1e-6 : 1e-40); x < T(1e-2); x = x * T(1.0137)) check(x);
+    std::cout << (excluded ? "FAIL" : "PASS") << " power chains (precision " << precision
+              << ") : " << checked << " checked, " << excluded << " excluded\n";
+    itv::programPrecision() = saved;
+    return excluded;
+}
+
 #ifdef INTERVAL_FLOAT_MPFR_ORACLE
 // These witnesses have only normal or zero finite results. Precision 24 with nearest
 // rounding therefore reproduces binary32 at every stage, without needing MPFR
@@ -163,6 +222,10 @@ double oracleValue(std::string_view name)
         mpfr_set_si(ref.result, -1, MPFR_RNDN);
         mpfr_fma(ref.result, ref.a, ref.b, ref.result, MPFR_RNDN);
         mpfr_mul_2ui(ref.result, ref.result, 26, MPFR_RNDN);
+    } else if (name == "power-chain") {
+        mpfr_set_d(ref.a, double(1.0642072f), MPFR_RNDN);
+        mpfr_set(ref.result, ref.a, MPFR_RNDN);
+        for (int k = 1; k < 8; k++) mpfr_mul(ref.result, ref.result, ref.a, MPFR_RNDN);
     } else {
         mpfr_set_d(ref.a, name == "sine-large" ? double(1.0e20f) : 100.0, MPFR_RNDN);
         mpfr_sin(ref.result, ref.a, MPFR_RNDN);
@@ -205,10 +268,11 @@ int main(int argc, char** argv)
         std::string_view name;
         Witness (*build)(const interval_algebra&);
     };
-    const std::array<Case, 7> cases{{
+    const std::array<Case, 8> cases{{
         {"addition", addition}, {"multiplication", multiplication},
         {"delay", delay}, {"conversion", conversion},
-        {"contraction", contraction}, {"sine", sine}, {"sine-large", largeSine}}};
+        {"contraction", contraction}, {"sine", sine}, {"sine-large", largeSine},
+        {"power-chain", powerChainWitness}}};
     std::cout << std::setprecision(17);
     int tested = 0, failures = 0;
     for (const auto& test : cases) {
@@ -245,6 +309,11 @@ int main(int argc, char** argv)
     if (!tested) {
         std::cerr << "Unknown witness: " << selected << '\n';
         return 2;
+    }
+    if (selected.empty()) {
+        failures += powerChainSweep<float>(1) != 0;
+        failures += powerChainSweep<double>(2) != 0;
+        tested += 2;
     }
     std::cout << tested << " checks, " << failures << " failures (required float inclusion).\n";
     return failures ? 1 : 0;
