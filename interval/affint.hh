@@ -46,6 +46,10 @@ struct AffItv {
     int    lsb = 0;           ///< precision, as in itv::interval
     bool   mayBeInvalid = false;  ///< a possible NaN or undefined operation
     bool   mayOverflow  = false;  ///< the int32 operation may wrap (interval::mayOverflow)
+    // A bound that keeps moving past the horizon although its rate is 0 : the corridor of
+    // a nonlinear operation whose operands move, reduced to its hull over [0, T].
+    bool   loDrifts = false;  ///< the lower bound may go on decreasing past T
+    bool   hiDrifts = false;  ///< the upper bound may go on increasing past T
 
     // Public API: monotonically add invalidity without changing the corridor.
     AffItv withInvalid(bool possible = true) const
@@ -64,6 +68,9 @@ struct AffItv {
 
     bool   isEmpty() const { return std::isnan(a0) || std::isnan(b0); }
     bool   isConst() const { return a1 == 0 && b1 == 0; }
+    // A corridor that does not move bounds its values for all time ; a moving one only up
+    // to the horizon.
+    bool   moving() const { return a1 != 0 || b1 != 0 || loDrifts || hiDrifts; }
     // Public API: enclose evaluation of the lower/upper affine line. In float/double
     // mode both product and sum round outward; t=0 avoids an inf*0 corner.
     double lo(double t) const
@@ -87,6 +94,22 @@ struct AffItv {
         return std::isnan(result) ? HUGE_VAL : result;
     }
 };
+
+/// x, its bounds drifting as well where those of y drift (a join, a widening)
+inline AffItv adrift(AffItv x, const AffItv& y)
+{
+    x.loDrifts = x.loDrifts || y.loDrifts;
+    x.hiDrifts = x.hiDrifts || y.hiDrifts;
+    return x;
+}
+
+/// x with its bounds exchanged for the drifts : the bound of -x or of z - x that x's
+/// upper bound makes is a lower one
+inline AffItv flipped(AffItv x)
+{
+    std::swap(x.loDrifts, x.hiDrifts);
+    return x;
+}
 
 /// Bottom: no values yet. Neutral in every join.
 inline AffItv aempty()
@@ -120,6 +143,19 @@ inline interval toItv(const AffItv& x, double T)
     return interval(lo, hi, x.lsb, x.mayBeInvalid).withOverflow(x.mayOverflow);
 }
 
+/// The values of x for all time : its hull over [0, T], each moving bound pushed to the
+/// limit of its nature (the int32 range for an integer, infinity for a float). An integer
+/// does not leave the int32 range without an operation that may wrap, flagged on its own.
+inline interval forever(const AffItv& x, double T)
+{
+    const interval h = toItv(x, T);
+    if (h.isEmpty() || !x.moving()) return h;
+    const bool   integer = x.lsb >= 0;
+    const double lo      = (x.a1 != 0 || x.loDrifts) ? (integer ? -2147483648.0 : -HUGE_VAL) : h.lo();
+    const double hi      = (x.b1 != 0 || x.hiDrifts) ? (integer ? 2147483647.0 : HUGE_VAL) : h.hi();
+    return interval(lo, hi, h.lsb(), h.mayBeInvalid()).withOverflow(h.mayOverflow());
+}
+
 /// Public API: prove x ⊑ y over [0,T], T>=0, by comparing exact affine lines at
 /// both endpoints. In float/double mode an upward enclosure of each difference must
 /// be nonpositive; comparing two separately rounded values could give a false proof.
@@ -129,6 +165,7 @@ inline bool aleq(const AffItv& x, const AffItv& y, double T)
     // An unchanged corridor with a new alert is a new abstract state.
     if (x.mayBeInvalid && !y.mayBeInvalid) return false;
     if (x.mayOverflow && !y.mayOverflow) return false;
+    if ((x.loDrifts && !y.loDrifts) || (x.hiDrifts && !y.hiDrifts)) return false;
     if (x.isEmpty()) return true;
     if (y.isEmpty()) return false;
     if (detail::usesNativeBounds()) {
@@ -179,15 +216,15 @@ inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
 {
     const bool invalid  = x.mayBeInvalid || y.mayBeInvalid;
     const bool overflow = x.mayOverflow || y.mayOverflow;
-    if (x.isEmpty()) return y.withInvalid(invalid).withOverflow(overflow);
-    if (y.isEmpty()) return x.withInvalid(invalid).withOverflow(overflow);
+    if (x.isEmpty()) return adrift(y.withInvalid(invalid).withOverflow(overflow), x);
+    if (y.isEmpty()) return adrift(x.withInvalid(invalid).withOverflow(overflow), y);
     AffItv r;
     achord(std::min(x.lo(0), y.lo(0)), std::min(x.lo(T), y.lo(T)), T, r.a0, r.a1);
     achord(std::max(x.hi(0), y.hi(0)), std::max(x.hi(T), y.hi(T)), T, r.b0, r.b1, true);
     r.lsb = std::min(x.lsb, y.lsb);
     r.mayBeInvalid = invalid;
     r.mayOverflow  = overflow;
-    return r;
+    return adrift(adrift(r, x), y);
 }
 
 /// The numeric core of widening, in two stages: the first widening of a moving bound
@@ -202,12 +239,13 @@ inline AffItv awiden(const AffItv& old, const AffItv& fresh, double T)
 {
     const bool invalid  = old.mayBeInvalid || fresh.mayBeInvalid;
     const bool overflow = old.mayOverflow || fresh.mayOverflow;
-    if (old.isEmpty() || fresh.isEmpty()) return fresh.withInvalid(invalid).withOverflow(overflow);
+    if (old.isEmpty() || fresh.isEmpty())
+        return adrift(fresh.withInvalid(invalid).withOverflow(overflow), old);
     const bool wlo = fresh.lo(0) < old.lo(0) || fresh.lo(T) < old.lo(T);
     const bool whi = fresh.hi(0) > old.hi(0) || fresh.hi(T) > old.hi(T);
-    if (!wlo && !whi) return fresh.withInvalid(invalid).withOverflow(overflow);
+    if (!wlo && !whi) return adrift(fresh.withInvalid(invalid).withOverflow(overflow), old);
 
-    AffItv r = fresh;
+    AffItv r = adrift(fresh, old);
     r.mayBeInvalid = invalid;
     r.mayOverflow  = overflow;
     if (whi) {

@@ -138,9 +138,10 @@ void affineTests()
     const AffItv counter{0, 0, 0, 1, 0};
     check("affine add : a unit counter plus one", true, F.Add(counter, C(1, 1)).mayOverflow);
     check("affine mul : a unit counter times two", true, F.Mul(counter, C(2, 2)).mayOverflow);
-    // a wrapped operand holds any int32 : the operation may wrap, even adding zero
+    // a wrapped operand holds any int32 : adding one may wrap, adding zero cannot
     const AffItv wrapped{0, 0, 0, 2, 0};
-    check("affine add : a wrapped operand", true, F.Add(wrapped, C(0, 0)).mayOverflow);
+    check("affine add : a wrapped operand plus one", true, F.Add(wrapped, C(1, 1)).mayOverflow);
+    check("affine add : a wrapped operand plus zero", false, F.Add(wrapped, C(0, 0)).mayOverflow);
 
     check("affine sum : a partial sum wraps", true,
           F.Sum({C(M, M), C(1, 1), C(-1, -1)}).mayOverflow);
@@ -157,6 +158,53 @@ void affineTests()
     check("an unflagged corridor is below a flagged one", true, aleq(C(0, 10), flagged, T));
 }
 
+// A corridor that moves bounds its values up to the horizon only : an int32 operation may
+// wrap when it may on the values of its operands for all time, and a nonlinear operation of
+// moving operands drifts past the horizon unless it bounds them.
+void growthTests()
+{
+    const double         T = 2147483648.0;
+    const affine_algebra F(T);
+    auto                 C = [](double lo, double hi) { return fromItv(I(lo, hi)); };
+
+    // an int growing by a quarter per sample, [0, 2^29] at the horizon
+    const AffItv slow{0, 0, 0, 0.25, 0};
+    check("growth : a slow int counter plus one", true, F.Add(slow, C(1, 1)).mayOverflow);
+    check("growth : a slow int counter minus one", false, F.Sub(slow, C(1, 1)).mayOverflow);
+    check("growth : a slow int counter negated", false, F.Neg(slow).mayOverflow);
+    check("growth : a slow int counter times two", true, F.Mul(slow, C(2, 2)).mayOverflow);
+
+    // the int conversion of a float accumulator keeps its growth
+    const AffItv acc{0, 0, 0, 0.5, -24};
+    const AffItv n = F.IntCast(acc);
+    check("growth : int of a float accumulator moves", true, n.moving());
+    check("growth : int of a float accumulator plus one", true, F.Add(n, C(1, 1)).mayOverflow);
+
+    // a modulo, a comparison, a sine bound a moving operand for all time
+    const AffItv r = F.Mod(slow, C(100, 100));
+    check("growth : a counter modulo 100 does not move", false, r.moving());
+    check("growth : a counter modulo 100, plus one", false, F.Add(r, C(1, 1)).mayOverflow);
+    check("growth : a comparison does not move", false, F.Lt(slow, C(10, 10)).moving());
+    check("growth : the sine of an accumulator does not move", false, F.Sin(acc).moving());
+
+    // a product of two moving operands is nonlinear : it drifts, and may wrap
+    const AffItv tiny{0, 0, 0, 0x1p-20, 0};  // [0, 2048] at the horizon
+    const AffItv sq = F.Mul(tiny, tiny);
+    check("growth : a product of two counters drifts", true, sq.hiDrifts);
+    check("growth : a product of two counters may wrap", true, sq.mayOverflow);
+    check("growth : a drifting int plus one", true, F.Add(sq, C(1, 1)).mayOverflow);
+    const AffItv gentle{0, 0, 0, 0x1p-30, -24};  // [0, 2] at the horizon
+    check("growth : the exponential of an accumulator drifts", true, F.Exp(gentle).hiDrifts);
+    check("growth : the exponential of a saturated one does not", false, F.Exp(acc).hiDrifts);
+
+    // a drift survives a delay and a join, and is part of the order
+    check("growth : a delayed drifting value drifts", true, F.Delay(sq, C(1, 1)).hiDrifts);
+    check("growth : a drifting corridor is not below a fixed one", false,
+          aleq(sq, C(-1e10, 1e10), T));
+    // a fixed corridor stays valid for all time
+    check("growth : a fixed corridor does not move", false, F.Add(C(0, 10), C(0, 10)).moving());
+}
+
 }  // namespace
 
 int main()
@@ -170,5 +218,6 @@ int main()
     floatTests(A);
     intCastTests(A);
     affineTests();
+    growthTests();
     return reportCheckResults();
 }
