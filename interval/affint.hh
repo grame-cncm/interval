@@ -45,12 +45,20 @@ struct AffItv {
     double b0 = NAN, b1 = 0;  ///< hi(t) = b0 + b1·t
     int    lsb = 0;           ///< precision, as in itv::interval
     bool   mayBeInvalid = false;  ///< a possible NaN or undefined operation
+    bool   mayOverflow  = false;  ///< the int32 operation may wrap (interval::mayOverflow)
 
     // Public API: monotonically add invalidity without changing the corridor.
     AffItv withInvalid(bool possible = true) const
     {
         AffItv result = *this;
         result.mayBeInvalid = mayBeInvalid || possible;
+        return result;
+    }
+    // Public API: monotonically add a possible overflow without changing the corridor.
+    AffItv withOverflow(bool possible = true) const
+    {
+        AffItv result = *this;
+        result.mayOverflow = mayOverflow || possible;
         return result;
     }
 
@@ -91,7 +99,7 @@ inline AffItv aempty()
 inline AffItv fromItv(const interval& x)
 {
     // Empty numeric bounds can still carry invalid execution and its nature.
-    return {x.lo(), 0, x.hi(), 0, x.lsb(), x.mayBeInvalid()};
+    return {x.lo(), 0, x.hi(), 0, x.lsb(), x.mayBeInvalid(), x.mayOverflow()};
 }
 
 /// Collapse to the ordinary interval hull over [0, T] — THE bridge from affine claims
@@ -102,13 +110,14 @@ inline AffItv fromItv(const interval& x)
 /// past absorption — the value freezes, the form keeps over-approximating it.
 inline interval toItv(const AffItv& x, double T)
 {
-    if (x.isEmpty()) return empty(x.lsb).withInvalid(x.mayBeInvalid);
+    if (x.isEmpty()) return empty(x.lsb).withInvalid(x.mayBeInvalid).withOverflow(x.mayOverflow);
     const double lo = std::min(x.lo(0), x.lo(T));
     const double hi = std::max(x.hi(0), x.hi(T));
     if (x.lsb >= 0 && (hi > 2147483647.0 || lo < -2147483648.0)) {
-        return {-2147483648.0, 2147483647.0, x.lsb, x.mayBeInvalid};
+        return interval(-2147483648.0, 2147483647.0, x.lsb, x.mayBeInvalid)
+            .withOverflow(x.mayOverflow);
     }
-    return {lo, hi, x.lsb, x.mayBeInvalid};
+    return interval(lo, hi, x.lsb, x.mayBeInvalid).withOverflow(x.mayOverflow);
 }
 
 /// Public API: prove x ⊑ y over [0,T], T>=0, by comparing exact affine lines at
@@ -119,6 +128,7 @@ inline bool aleq(const AffItv& x, const AffItv& y, double T)
 {
     // An unchanged corridor with a new alert is a new abstract state.
     if (x.mayBeInvalid && !y.mayBeInvalid) return false;
+    if (x.mayOverflow && !y.mayOverflow) return false;
     if (x.isEmpty()) return true;
     if (y.isEmpty()) return false;
     if (detail::usesNativeBounds()) {
@@ -167,14 +177,16 @@ inline void achord(double v0, double vT, double T, double& c0, double& c1, bool 
 /// [0, T] (and min is concave, chord below). Exact when both are constant.
 inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
 {
-    const bool invalid = x.mayBeInvalid || y.mayBeInvalid;
-    if (x.isEmpty()) return y.withInvalid(invalid);
-    if (y.isEmpty()) return x.withInvalid(invalid);
+    const bool invalid  = x.mayBeInvalid || y.mayBeInvalid;
+    const bool overflow = x.mayOverflow || y.mayOverflow;
+    if (x.isEmpty()) return y.withInvalid(invalid).withOverflow(overflow);
+    if (y.isEmpty()) return x.withInvalid(invalid).withOverflow(overflow);
     AffItv r;
     achord(std::min(x.lo(0), y.lo(0)), std::min(x.lo(T), y.lo(T)), T, r.a0, r.a1);
     achord(std::max(x.hi(0), y.hi(0)), std::max(x.hi(T), y.hi(T)), T, r.b0, r.b1, true);
     r.lsb = std::min(x.lsb, y.lsb);
     r.mayBeInvalid = invalid;
+    r.mayOverflow  = overflow;
     return r;
 }
 
@@ -188,14 +200,16 @@ inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
 /// (A domain may run a certification stage before this one — e.g. a probe threshold.)
 inline AffItv awiden(const AffItv& old, const AffItv& fresh, double T)
 {
-    const bool invalid = old.mayBeInvalid || fresh.mayBeInvalid;
-    if (old.isEmpty() || fresh.isEmpty()) return fresh.withInvalid(invalid);
+    const bool invalid  = old.mayBeInvalid || fresh.mayBeInvalid;
+    const bool overflow = old.mayOverflow || fresh.mayOverflow;
+    if (old.isEmpty() || fresh.isEmpty()) return fresh.withInvalid(invalid).withOverflow(overflow);
     const bool wlo = fresh.lo(0) < old.lo(0) || fresh.lo(T) < old.lo(T);
     const bool whi = fresh.hi(0) > old.hi(0) || fresh.hi(T) > old.hi(T);
-    if (!wlo && !whi) return fresh.withInvalid(invalid);
+    if (!wlo && !whi) return fresh.withInvalid(invalid).withOverflow(overflow);
 
     AffItv r = fresh;
     r.mayBeInvalid = invalid;
+    r.mayOverflow  = overflow;
     if (whi) {
         if (old.b1 == fresh.b1 && old.b1 == 0 && std::isfinite(fresh.b0 - old.b0)) {
             r.b1 = fresh.b0 - old.b0;  // propose the observed per-round rate

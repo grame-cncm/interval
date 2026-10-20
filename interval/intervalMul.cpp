@@ -63,7 +63,8 @@ interval interval_algebra::numericMul(const interval& xIn, const interval& yIn) 
         // the products of the bounds, in double : exact when they lie in the int32 range, and
         // a product beyond it cannot round back into it. A product beyond the range wraps.
         if (lo < (double)INT_MIN || hi > (double)INT_MAX) {
-            return {(double)INT_MIN, (double)INT_MAX, detail::sumLSB(x.lsb(), y.lsb())};
+            return interval((double)INT_MIN, (double)INT_MAX, detail::sumLSB(x.lsb(), y.lsb()))
+                .withOverflow();
         }
         /* interval z{lo, hi, x.lsb()+y.lsb()};
         interval shift{pow(2, 31), pow(2, 31), 31};

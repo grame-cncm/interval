@@ -141,19 +141,19 @@ int main()
         // integer Neg and Sub wrap around int32 like Add (computational semantics)
         const double IMIN = -2147483648.0, IMAX = 2147483647.0;
         checkExact("integer neg of INT_MIN wraps to INT_MIN",
-                   ia.Neg(interval(IMIN, IMIN, 0)), interval(IMIN, IMIN, 0));
+                   ia.Neg(interval(IMIN, IMIN, 0)), interval(IMIN, IMIN, 0).withOverflow());
         checkExact("integer neg straddling the boundary widens to full int32",
-                   ia.Neg(interval(IMIN, IMIN + 5, 0)), interval(IMIN, IMAX, 0));
+                   ia.Neg(interval(IMIN, IMIN + 5, 0)), interval(IMIN, IMAX, 0).withOverflow());
         checkExact("integer neg without wrap stays exact",
                    ia.Neg(interval(-5, 10, 0)), interval(-10, 5, 0));
         checkExact("integer sub reaching -INT_MIN widens to full int32",
                    ia.Sub(interval(0, 0, 0), interval(IMIN, IMAX, 0)),
-                   interval(IMIN, IMAX, 0));
+                   interval(IMIN, IMAX, 0).withOverflow());
         checkExact("integer sub without wrap stays exact",
                    ia.Sub(interval(0, 0, 0), interval(-10, 10, 0)), interval(-10, 10, 0));
         checkExact("integer sub wholly past the boundary wraps coherently",
                    ia.Sub(interval(IMIN, IMIN, 0), interval(1, 1, 0)),
-                   interval(IMAX, IMAX, 0));
+                   interval(IMAX, IMAX, 0).withOverflow());
 
         // the general conformity pass : Abs, Lsh, LRsh, Remainder
         checkExact("integer abs containing INT_MIN reaches both ends",

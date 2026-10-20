@@ -48,7 +48,8 @@ int main()
     check("double: integer * widened integer keeps the int32 wrap", true,
           algebra.Mul(algebra.IntNum(1103515245), widenedInt).has(-1));
     check("double: integer - widened integer stays within int32", true,
-          algebra.Sub(algebra.IntNum(0), widenedInt) == interval(INT_MIN, INT_MAX, 0));
+          algebra.Sub(algebra.IntNum(0), widenedInt) ==
+              interval(INT_MIN, INT_MAX, 0).withOverflow());
     check("double: widened integer % 100 is an integer remainder", true,
           algebra.Mod(widenedInt, algebra.IntNum(100)) == interval(-99, 99, 0));
     // The affine domain evaluates an integer counter at its horizon, beyond INT_MAX.

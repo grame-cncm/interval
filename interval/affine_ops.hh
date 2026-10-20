@@ -168,10 +168,11 @@ class AffineOps : public Base {
             // Indeterminate coefficients must not erase numeric execution paths.
             if (result.isEmpty() || std::isnan(result.a1) || std::isnan(result.b1))
                 return fromItv(interval(-HUGE_VAL, HUGE_VAL, std::min(x.lsb, y.lsb)));
-            return result;
+            return integerOverflow(result, x, y);
         }
-        return {x.a0 + y.a0, x.a1 + y.a1, x.b0 + y.b0, x.b1 + y.b1,
-                std::min(x.lsb, y.lsb)};
+        return integerOverflow({x.a0 + y.a0, x.a1 + y.a1, x.b0 + y.b0, x.b1 + y.b1,
+                                std::min(x.lsb, y.lsb)},
+                               x, y);
     }
     // Numeric kernel: coefficient-wise enclosure of x-y over a nonnegative horizon (see
     // numericAdd for the constant corridors).
@@ -191,15 +192,16 @@ class AffineOps : public Base {
                     std::min(x.lsb, y.lsb)};
             if (result.isEmpty() || std::isnan(result.a1) || std::isnan(result.b1))
                 return fromItv(interval(-HUGE_VAL, HUGE_VAL, std::min(x.lsb, y.lsb)));
-            return result;
+            return integerOverflow(result, x, y);
         }
-        return {x.a0 - y.b0, x.a1 - y.b1, x.b0 - y.a0, x.b1 - y.a1,
-                std::min(x.lsb, y.lsb)};
+        return integerOverflow({x.a0 - y.b0, x.a1 - y.b1, x.b0 - y.a0, x.b1 - y.a1,
+                                std::min(x.lsb, y.lsb)},
+                               x, y);
     }
     AffItv numericNeg(const AffItv& x) const
     {
         if (x.isEmpty()) return aempty();
-        return {-x.b0, -x.b1, -x.a0, -x.a1, x.lsb};
+        return integerOverflow({-x.b0, -x.b1, -x.a0, -x.a1, x.lsb}, x, x);
     }
     AffItv numericMul(const AffItv& x, const AffItv& y) const
     {
@@ -992,29 +994,39 @@ class AffineOps : public Base {
     AffItv Sum(const std::vector<AffItv>& terms) const override
     {
         if (terms.empty()) return this->IntNum(0);
-        AffItv acc = terms[0];
-        for (size_t k = 1; k < terms.size(); k++) acc = this->Add(acc, terms[k]);
-        return acc;
+        AffItv acc      = terms[0];
+        bool   overflow = false;  // one of the partial sums may wrap
+        for (size_t k = 1; k < terms.size(); k++) {
+            acc      = this->Add(acc, terms[k]);
+            overflow = overflow || acc.mayOverflow;
+        }
+        return acc.withOverflow(overflow);
     }
     AffItv Prod(const std::vector<AffItv>& factors) const override
     {
         if (factors.empty()) return this->IntNum(1);
-        AffItv acc = factors[0];
-        for (size_t k = 1; k < factors.size(); k++) acc = this->Mul(acc, factors[k]);
-        return acc;
+        AffItv acc      = factors[0];
+        bool   overflow = false;  // one of the partial products may wrap
+        for (size_t k = 1; k < factors.size(); k++) {
+            acc      = this->Mul(acc, factors[k]);
+            overflow = overflow || acc.mayOverflow;
+        }
+        return acc.withOverflow(overflow);
     }
     AffItv Fir(const AffItv& x, const std::vector<AffItv>& coefs) const override
     {
-        bool   first = true;
+        bool   first    = true;
+        bool   overflow = false;  // one of the products or partial sums may wrap
         AffItv acc;
         for (size_t k = 0; k < coefs.size(); k++) {
             const AffItv& ck = coefs[k];
             if (!ck.isEmpty() && ck.isConst() && ck.a0 == 0 && ck.b0 == 0 && !ck.mayBeInvalid) continue;
             AffItv term = (k == 0) ? this->Mul(ck, x) : this->Mul(ck, this->Delay(x, this->IntNum(int(k))));
             acc         = first ? term : this->Add(acc, term);
+            overflow    = overflow || term.mayOverflow || acc.mayOverflow;
             first       = false;
         }
-        return first ? this->IntNum(0) : acc;
+        return first ? this->IntNum(0) : acc.withOverflow(overflow);
     }
     AffItv Iir(const AffItv& x, const std::vector<AffItv>& coefs) const override
     {
@@ -1182,6 +1194,15 @@ class AffineOps : public Base {
                              std::max(x.hi(0), x.hi(fT)) > 2147483647.0);
     }
 
+    /// r, the result of a linear int32 operation on x and y, flagged when the operation
+    /// may wrap : its exact corridor leaves the int32 range over the horizon, or an
+    /// operand's does (that operand has wrapped, and holds any int32 value)
+    AffItv integerOverflow(const AffItv& r, const AffItv& x, const AffItv& y) const
+    {
+        if (r.lsb < 0) return r;
+        return r.withOverflow(integerMayWrap(r) || integerMayWrap(x) || integerMayWrap(y));
+    }
+
     template <typename F>
     AffItv c1(const AffItv& x, F f) const
     {
@@ -1222,7 +1243,8 @@ class AffineOps : public Base {
         AffItv r;
         achord(r0.lo(), rT.lo(), fT, r.a0, r.a1);
         achord(r0.hi(), rT.hi(), fT, r.b0, r.b1, true);
-        r.lsb = std::min(r0.lsb(), rT.lsb());
+        r.lsb         = std::min(r0.lsb(), rT.lsb());
+        r.mayOverflow = r0.mayOverflow() || rT.mayOverflow();
         return r;
     }
 
