@@ -210,6 +210,28 @@ void mixes(int precision)
     }
     expect(bad == 0, "inclusion of mix, plain and fused" + p +
                          (bad ? " -- " + std::to_string(bad) + " values outside" : ""));
+
+    // the mix weighted by 1 - t, computed b + t (a - b) from t itself (MixOfComplement) :
+    // the case of a t that 1 - t would round away, of a weight of the difference up to 1/2,
+    // and of a weight up to 1
+    const Case wcases[] = {{interval(1e-8, 2e-8, -24), interval(0.9, 1, -24), interval(0.001, 0.002, -24)},
+                           {interval(0, 0.5, -24), interval(-12, 12, -24), interval(-12, 12, -24)},
+                           {interval(0.3, 1, -24), interval(-1, 1, -24), interval(-1, 1, -24)}};
+    int wbad = 0;
+    for (const Case& k : wcases) {  // k.c holds t
+        const interval R = A.MixOfComplement(k.c, k.a, k.b);
+        std::uniform_real_distribution<double> ut(k.c.lo(), k.c.hi()), ua(k.a.lo(), k.a.hi()),
+            ub(k.b.lo(), k.b.hi());
+        for (int s = 0; s < 20000; s++) {
+            const T t = value<T>(s % 2 ? k.c.hi() : ut(rng)), a = value<T>(ua(rng)), b = value<T>(ub(rng));
+            const T plain = b + t * (a - b);
+            const T fused = std::fma(t, a - b, b);
+            if (!within(double(plain), R)) wbad++;
+            if (!within(double(fused), R)) wbad++;
+        }
+    }
+    expect(wbad == 0, "inclusion of the mix weighted by 1 - t, plain and fused" + p +
+                          (wbad ? " -- " + std::to_string(wbad) + " values outside" : ""));
 }
 
 template <typename T>
