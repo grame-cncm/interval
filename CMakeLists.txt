@@ -97,6 +97,12 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set_source_files_properties(tests/compound_tests.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=off")
 endif ()
 
+# The int32 operations wrap as the program does : no overflow, the exact edges of the range,
+# a crossing (the whole range), a certain overflow (the shifted range) ; a float never wraps.
+add_executable(WrapTests tests/wrap_tests.cpp)
+set_target_properties(WrapTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(WrapTests PRIVATE interval)
+
 enable_testing()
 add_test(NAME interval_unit_tests COMMAND IntervalTests)
 add_test(NAME directed_bounds_tests COMMAND DirectedBoundsTests)
@@ -109,6 +115,7 @@ add_test(NAME invalidity_tests COMMAND InvalidityTests)
 add_test(NAME delay_tests COMMAND DelayTests)
 add_test(NAME compound_tests COMMAND CompoundTests)
 add_test(NAME kernel_tests COMMAND KernelTests)
+add_test(NAME wrap_tests COMMAND WrapTests)
 
 if(INTERVAL_ENABLE_MPFR_TESTS)
     find_package(PkgConfig QUIET)
