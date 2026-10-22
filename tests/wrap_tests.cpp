@@ -89,6 +89,10 @@ void powTests(const interval_algebra& A)
     check("pow : [0, 100000]^2 may wrap", true, A.Pow(I(0, 100000), I(2, 2)).mayOverflow());
     check("pow : [0, 1000]^2 does not wrap", false, A.Pow(I(0, 1000), I(2, 2)).mayOverflow());
     check("pow : a float power never wraps", false, A.Pow(interval(2, 2, -24), interval(40, 40, 0)).mayOverflow());
+    // an integer recursion is computed by sums and products that wrap
+    check("iir : an integer recursion may wrap", true, A.Iir(I(0, 1), {I(1, 1)}).mayOverflow());
+    check("iir : a float recursion does not wrap", false,
+          A.Iir(interval(0, 1, -24), {interval(0.5, 0.5, -24)}).mayOverflow());
 }
 
 void sumTests(const interval_algebra& A)

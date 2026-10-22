@@ -365,10 +365,11 @@ interval interval_algebra::Iir(const interval& x, const std::vector<interval>& c
     const interval anything = interval(-HUGE_VAL, HUGE_VAL, lsb, true);
 
     // an integer recursion wraps modulo 2^32 : whatever its coefficients, its values stay
-    // in int32, and it never makes a NaN (a congruential noise generator)
+    // in int32, and it never makes a NaN (a congruential noise generator) ; its operations
+    // may wrap
     bool integer = x.lsb() >= 0;
     for (const interval& ci : coefs) integer = integer && ci.lsb() >= 0;
-    if (integer) return interval(-2147483648.0, 2147483647.0, 0).withInvalid(invalid);
+    if (integer) return interval(-2147483648.0, 2147483647.0, 0).withInvalid(invalid).withOverflow();
 
     // the coefficients of the program : constants at the program's precision, one value,
     // or the two neighbours enclosing a constant the precision cannot represent (the
