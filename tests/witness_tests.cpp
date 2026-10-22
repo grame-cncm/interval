@@ -87,6 +87,12 @@ int main()
                        std::pow(-HUGE_VAL, -0.5) + 2147483647.0 + 1.0));
     }
     check("witness : 2.5 is not a power of 2", false, interval(2.5).ispowerof2());
+    // frac of an unbounded product contracted with its subtraction : fma(a, b, -floor(a * b))
+    {
+        volatile double a = std::ldexp(1.0, 30) - 1, b = std::ldexp(1.0, 30) + 1;
+        check("witness : frac([0, +inf]) holds a contracted remainder", true,
+              contains(A.Frac(interval(0, HUGE_VAL, -24)), std::fma(a, b, -std::floor(a * b))));
+    }
     // round, as the generated code : halves away from zero
     check("witness : affine round(2.5) holds 3", true, contains(toItv(F.Round(fromItv(interval(2.5, 2.5, -1))), T), 3.0));
     // prefix(1000, t) - t is -1 from t = 1 on
