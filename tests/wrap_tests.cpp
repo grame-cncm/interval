@@ -267,6 +267,22 @@ void growthTests()
     check("fir : a null coefficient that drifts makes the sum drift", true, fir.hiDrifts);
     check("fir : a null coefficient that does not drift adds nothing", false,
           F.Fir(C(1, 1), {C(1, 1), C(0, 0)}).hiDrifts);
+
+    // the motion of the bounds of a hull : each bound on its own
+    const interval accm = hullWithMotion(acc, T);
+    check("motion : a float accumulator, its lower bound holds", false, accm.loMoves());
+    check("motion : a float accumulator, its upper bound moves", true, accm.hiMoves());
+    const interval wm = hullWithMotion(w, T);
+    check("motion : a counter that may wrap moves on both sides", true, wm.loMoves() && wm.hiMoves());
+    check("motion : a fixed corridor does not move", false, hullWithMotion(C(0, 10), T).moves());
+    check("motion : a wrapped counter, the whole int32 range, does not move", false,
+          hullWithMotion(F.Add(AffItv{0, 0, 0, 1, 0}, C(1, 1)), T).moves());
+    check("motion : the reunion moves where either moves", true,
+          reunion(I(0, 1), I(0, 1).withMotion(false, true)).hiMoves());
+    check("motion : the intersection set by a fixed bound does not move", false,
+          intersection(I(0, 1), I(0, 2).withMotion(false, true)).hiMoves());
+    check("motion : the intersection set by a moving bound moves", true,
+          intersection(I(0, 1).withMotion(false, true), I(0, 2)).hiMoves());
 }
 
 }  // namespace
