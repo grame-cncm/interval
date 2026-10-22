@@ -1285,8 +1285,10 @@ class AffineOps : public Base {
         achord(r0.hi(), rT.hi(), fT, r.b0, r.b1, true);
         r.lsb         = std::min(r0.lsb(), rT.lsb());
         // an int32 product may wrap on the values of its operands for all time
-        r.mayOverflow = r.lsb >= 0 && op(forever(x, fT), forever(y, fT)).mayOverflow();
-        return r.wrapDrift();
+        const interval all = op(forever(x, fT), forever(y, fT));
+        r.mayOverflow      = r.lsb >= 0 && all.mayOverflow();
+        // an operand that crosses zero, times a constant of either sign, grows again past T
+        return chordDrift(r, all, fT).wrapDrift();
     }
 
     /// x delayed by at least nlo samples, with a positive delay still possible,

@@ -213,6 +213,22 @@ void growthTests()
     const AffItv k = F.Add(C(M, M), C(1, 1));
     check("wrap : a constant that wraps moves", true, k.mayOverflow && k.moving());
     check("wrap : a fixed corridor that cannot wrap does not drift", false, F.Add(C(0, 10), C(0, 10)).loDrifts);
+
+    // a chord that does not rise while a bound it covers keeps rising : the bound drifts.
+    // The join of a rising and a falling bound : flat at 10 over [0, T], unbounded past T.
+    const AffItv up{0, 0, 0, 10 / T, 0}, down{0, 0, 10, -10 / T, 0};
+    const AffItv j = ajoin(up, down, T);
+    check("chord : the join of a rising and a falling bound drifts", true, j.hiDrifts);
+    check("chord : its flat chord bounds [0, T]", true, j.hi(0) == 10 && j.hi(T) == 10);
+    // a float crossing zero, times a constant of either sign : the product shrinks over
+    // [0, T], then grows again past it
+    const AffItv cross{-1610612736.0, 1, -1610612736.0, 1, -24};
+    const AffItv g = F.Mul(cross, fromItv(interval(-1, 1, -24)));
+    check("chord : a product crossing zero by a signed constant drifts", true, g.loDrifts && g.hiDrifts);
+    // a rising chord needs no drift : its line already leaves every bound past T
+    const AffItv twice = F.Mul(acc, fromItv(interval(2, 2, -24)));
+    check("chord : a rising float product moves", true, twice.moving());
+    check("chord : a rising float product does not drift", false, twice.loDrifts || twice.hiDrifts);
 }
 
 }  // namespace

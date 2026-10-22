@@ -220,6 +220,17 @@ inline void achord(double v0, double vT, double T, double& c0, double& c1, bool 
 /// Join (reunion) of two forms: endpoint hulls, chorded back to affine. Sound by
 /// convexity — max of affine functions is convex, so its chord lies above it on
 /// [0, T] (and min is concave, chord below). Exact when both are constant.
+/// r, a chord through the bounds of a result at 0 and T, with a bound that does not rise
+/// drifting where all, the result on the values of its operands for all time, goes beyond
+/// it : the chord bounds [0, T] only (a bound that rises leaves every value past T anyway)
+inline AffItv chordDrift(AffItv r, const interval& all, double T)
+{
+    if (r.isEmpty() || all.isEmpty()) return r;
+    if (r.a1 >= 0 && all.lo() < std::min(r.lo(0), r.lo(T))) r.loDrifts = true;
+    if (r.b1 <= 0 && all.hi() > std::max(r.hi(0), r.hi(T))) r.hiDrifts = true;
+    return r;
+}
+
 inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
 {
     const bool invalid  = x.mayBeInvalid || y.mayBeInvalid;
@@ -232,7 +243,7 @@ inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
     r.lsb = std::min(x.lsb, y.lsb);
     r.mayBeInvalid = invalid;
     r.mayOverflow  = overflow;
-    return adrift(adrift(r, x), y);
+    return chordDrift(adrift(adrift(r, x), y), reunion(forever(x, T), forever(y, T)), T).wrapDrift();
 }
 
 /// The numeric core of widening, in two stages: the first widening of a moving bound
