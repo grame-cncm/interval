@@ -93,6 +93,36 @@ int main()
         check("witness : frac([0, +inf]) holds a contracted remainder", true,
               contains(A.Frac(interval(0, HUGE_VAL, -24)), std::fma(a, b, -std::floor(a * b))));
     }
+    // in double, the program rounds (t + 0.1) - t at every sample
+    {
+        const AffItv x{0, 1, 0, 1, -24};
+        const AffItv v = F.Sub(F.Add(x, F.FloatNum(0.1)), x);
+        volatile double t1 = 1, u1 = t1 + 0.1, v1 = u1 - t1;
+        check("witness : affine (t + 0.1) - t holds its rounded value at t = 1", true, v.lo(1) <= v1 && v1 <= v.hi(1));
+        check("witness : affine ((t + 0.1) - t) == 0.1 is not folded to true", true,
+              contains(toItv(F.Eq(v, F.FloatNum(0.1)), T), v1 == 0.1 ? 1.0 : 0.0));
+    }
+    // a double accumulator y = y' + 0.1 : its widened corridor is stationary and holds the
+    // rounded sums of the program
+    {
+        const AffItv inc = F.FloatNum(0.1);
+        AffItv       y   = aempty();
+        bool         done = false;
+        for (int it = 1; !done && it <= 100; it++) {
+            AffItv f = F.Add(F.Delay(y, F.IntNum(1)), inc);
+            if (it > 8) f = awiden(y, f, T);
+            done = !y.isEmpty() && aleq(f, y, T);
+            y    = f;
+        }
+        volatile double acc = 0;
+        bool            in  = true;
+        for (int t = 1; t <= T; t++) {
+            acc = acc + 0.1;
+            in  = in && y.lo(t) <= acc && acc <= y.hi(t);
+        }
+        check("witness : affine double accumulator is stationary", true, done && std::isfinite(y.b0) && y.b1 > 0);
+        check("witness : affine double accumulator holds the rounded sums", true, in);
+    }
     // round, as the generated code : halves away from zero
     check("witness : affine round(2.5) holds 3", true, contains(toItv(F.Round(fromItv(interval(2.5, 2.5, -1))), T), 3.0));
     // prefix(1000, t) - t is -1 from t = 1 on
