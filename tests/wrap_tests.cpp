@@ -250,6 +250,15 @@ void growthTests()
     check("probe : a drifting image is not below a fixed seed", false, aleq(image, seed, T));
     check("probe : it is within the seed over [0, T]", true, aleqWithin(image, seed, T));
     check("probe : a larger image is not within the seed", false, aleqWithin(C(0, 32), seed, T));
+
+    // a corridor rebuilt from hulls : between moving values it drifts where they move ; as
+    // the meet of two bounds, only where both move
+    const AffItv fixed = C(0, 10), rising{0, 0, 0, 1, -24};
+    const AffItv h = hullDrift(C(0, 20), {fixed, rising});
+    check("rebuild : between a fixed and a rising value, the upper bound drifts", true, h.hiDrifts && !h.loDrifts);
+    const AffItv mt = meetDrift(C(0, 10), fixed, rising);
+    check("rebuild : the meet with a fixed bound does not drift", false, mt.hiDrifts);
+    check("rebuild : the meet of two rising bounds drifts", true, meetDrift(C(0, 10), rising, rising).hiDrifts);
 }
 
 }  // namespace
