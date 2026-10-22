@@ -197,6 +197,16 @@ inline bool aleq(const AffItv& x, const AffItv& y, double T)
            x.hi(T) <= y.hi(T);
 }
 
+/// x ⊑ y over [0, T] only : what happens past the horizon (the drifts, an overflow on the
+/// values for all time) set aside. A probe seed claims a bound over [0, T] ; its image
+/// keeps its own drifts.
+inline bool aleqWithin(AffItv x, AffItv y, double T)
+{
+    x.loDrifts = x.hiDrifts = x.mayOverflow = false;
+    y.loDrifts = y.hiDrifts = y.mayOverflow = false;
+    return aleq(x, y, T);
+}
+
 /// Public API: write a lower chord (upper when upper=true) over [0,T], T>=0.
 /// Directed subtraction and division enclose the slope in float/double mode. A zero
 /// horizon or nonfinite endpoints use a constant hull in the requested direction.

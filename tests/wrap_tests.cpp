@@ -243,6 +243,13 @@ void growthTests()
     const AffItv twice = F.Mul(acc, fromItv(interval(2, 2, -24)));
     check("chord : a rising float product moves", true, twice.moving());
     check("chord : a rising float product does not drift", false, twice.loDrifts || twice.hiDrifts);
+
+    // a probe seed claims a bound over [0, T] : its image may drift past it
+    AffItv seed = C(0, 16), image = C(0, 8);
+    image.hiDrifts = true;
+    check("probe : a drifting image is not below a fixed seed", false, aleq(image, seed, T));
+    check("probe : it is within the seed over [0, T]", true, aleqWithin(image, seed, T));
+    check("probe : a larger image is not within the seed", false, aleqWithin(C(0, 32), seed, T));
 }
 
 }  // namespace
