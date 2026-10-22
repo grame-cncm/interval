@@ -233,9 +233,23 @@ class AffineOps : public Base {
             (nn.isEmpty() || !std::isfinite(nn.lo())) ? 0 : std::max(0.0, nn.lo());
         return delayed(x, nlo);
     }
+    // prefix(x, y) is x at t = 0, then y(t - 1) : x joined with the corridor of y shifted by
+    // one sample (a moving line evaluated one sample earlier is not within its own corridor)
     AffItv numericPrefix(const AffItv& x, const AffItv& y) const
     {
-        return ajoin(x, y, fT);
+        if (y.isEmpty()) return ajoin(x, y, fT);
+        AffItv s = y;
+        if (y.a1 != 0) {
+            s.a0 = detail::usesNativeBounds()
+                       ? detail::directedBinary(detail::BinaryOp::Sub, y.a0, y.a1, detail::Direction::Down)
+                       : y.a0 - y.a1;
+        }
+        if (y.b1 != 0) {
+            s.b0 = detail::usesNativeBounds()
+                       ? detail::directedBinary(detail::BinaryOp::Sub, y.b0, y.b1, detail::Direction::Up)
+                       : y.b0 - y.b1;
+        }
+        return ajoin(x, s, fT);
     }
     AffItv numericAssertBounds(const AffItv& lo, const AffItv& hi, const AffItv& x) const
     {
@@ -478,8 +492,8 @@ class AffineOps : public Base {
     }
     AffItv numericRound(const AffItv& x) const
     {
-        // mirrors roundprim: delegated to Rint
-        return c1(x, [this](const interval& a) { return fItv.Rint(a); });
+        // the generated code calls round (halves away from zero), not rint
+        return c1(x, [this](const interval& a) { return fItv.Round(a); });
     }
     AffItv numericSin(const AffItv& x) const
     {
@@ -513,9 +527,12 @@ class AffineOps : public Base {
     //--- tables -----------------------------------------------------------------------
     AffItv numericRDTbl(const AffItv& tbl, const AffItv& arg1) const
     { return tbl; }
+    // a cell read at t was written at some t' <= t : the values written, over [0, T] and not
+    // as corridors, drifting where they move past the horizon
     AffItv numericWRTbl(const AffItv& arg0, const AffItv& g, const AffItv& arg2, const AffItv& ws) const
     {
-        return ajoin(g, ws, fT);
+        if (g.isEmpty() || ws.isEmpty()) return ajoin(g, ws, fT);
+        return hullDrift(fromItv(reunion(toItv(g, fT), toItv(ws, fT))), {g, ws});
     }
     AffItv numericGen(const AffItv& x) const
     { return x; }

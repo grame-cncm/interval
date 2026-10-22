@@ -87,5 +87,15 @@ int main()
                        std::pow(-HUGE_VAL, -0.5) + 2147483647.0 + 1.0));
     }
     check("witness : 2.5 is not a power of 2", false, interval(2.5).ispowerof2());
+    // round, as the generated code : halves away from zero
+    check("witness : affine round(2.5) holds 3", true, contains(toItv(F.Round(fromItv(interval(2.5, 2.5, -1))), T), 3.0));
+    // prefix(1000, t) - t is -1 from t = 1 on
+    {
+        const AffItv d = F.Sub(F.Prefix(F.IntNum(1000), counter), counter);
+        check("witness : affine prefix(1000, t) - t holds -1 at t = 1", true, d.lo(1) <= -1 && -1 <= d.hi(1));
+        const AffItv w = F.WRTbl(F.IntNum(16), F.IntNum(1000), fromItv(interval(0, 1, 0)), counter);
+        const AffItv e = F.Sub(F.RDTbl(w, F.IntNum(0)), counter);
+        check("witness : a table cell written at 0 read at 500, minus t, holds -500", true, contains(toItv(e, T), -500.0));
+    }
     return reportCheckResults();
 }
