@@ -81,6 +81,16 @@ void mulTests(const interval_algebra& A)
     check("mul : -1 times INT_MIN wraps to INT_MIN", true, p.has(m) && p.mayOverflow());
 }
 
+// the int32 power is computed by products : it wraps where they would
+void powTests(const interval_algebra& A)
+{
+    check("pow : 2^30 does not wrap", false, A.Pow(I(2, 2), I(30, 30)).mayOverflow());
+    check("pow : 2^31 may wrap", true, A.Pow(I(2, 2), I(31, 31)).mayOverflow());
+    check("pow : [0, 100000]^2 may wrap", true, A.Pow(I(0, 100000), I(2, 2)).mayOverflow());
+    check("pow : [0, 1000]^2 does not wrap", false, A.Pow(I(0, 1000), I(2, 2)).mayOverflow());
+    check("pow : a float power never wraps", false, A.Pow(interval(2, 2, -24), interval(40, 40, 0)).mayOverflow());
+}
+
 void sumTests(const interval_algebra& A)
 {
     // the partial sums from left to right : INT_MAX + 1 wraps, then - 1 comes back
@@ -240,6 +250,7 @@ int main()
     subTests(A);
     negTests(A);
     mulTests(A);
+    powTests(A);
     sumTests(A);
     floatTests(A);
     intCastTests(A);

@@ -100,7 +100,8 @@ int main()
                interval(4, 9, 2));
     checkExact("integer power with possible wrapping",
                algebra.Pow(interval(60, 62, 0), interval(8, 106, 0)),
-               interval(static_cast<double>(INT32_MIN), static_cast<double>(INT32_MAX), 0));
+               interval(static_cast<double>(INT32_MIN), static_cast<double>(INT32_MAX), 0)
+                   .withOverflow());
     // the raw bounds of the algebra : the compensation of the libm is turned off here
     libmCompensation() = false;
     checkExact("fixed integer exponent preserves sufficient precision",
