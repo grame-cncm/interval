@@ -270,6 +270,9 @@ class AffineOps : public Base {
     AffItv numericIntCast(const AffItv& x) const
     {
         if (x.isEmpty()) return aempty();
+        // the conversion of an int32 is the identity : its lines, beyond int32 once it has
+        // wrapped, are read as the whole int32 range by toItv, never saturated
+        if (x.lsb >= 0) return x;
         if (x.isConst() || detail::intCastInvalid(toItv(x, fT)))
             return collapse(x.moving(), [&](auto hull) { return fItv.IntCast(hull(x)); });
         const bool nonneg = std::min(x.lo(0), x.lo(fT)) >= 0;  // the bottom line stays >= 0
@@ -444,8 +447,8 @@ class AffineOps : public Base {
     }
     AffItv numericExp10(const AffItv& x) const
     {
-        // mirrors exp10prim: Pow(10, x)
-        return c1(x, [this](const interval& a) { return fItv.Pow(interval(10, 10, 0), a); });
+        // the oracle computes a floating power of 10 (an integer power of 10 would wrap)
+        return c1(x, [this](const interval& a) { return fItv.Exp10(a); });
     }
     AffItv numericFloor(const AffItv& x) const
     {
@@ -1271,7 +1274,11 @@ class AffineOps : public Base {
         // conversion: a wrap between endpoints cannot be represented by a chord.
         // A drifting operand has no line to evaluate at both endpoints.
         const bool drifts = x.loDrifts || x.hiDrifts || y.loDrifts || y.hiDrifts;
-        if ((programPrecision() == 1 && (isDiv || x.lsb < 0 || y.lsb < 0)) ||
+        // an int32 product that may wrap over [0, T] has no chord : its wrapped values are
+        // not between the values at 0 and T
+        const bool productWraps = !isDiv && x.lsb >= 0 && y.lsb >= 0 &&
+                                  fItv.Mul(toItv(x, fT), toItv(y, fT)).mayOverflow();
+        if ((programPrecision() == 1 && (isDiv || x.lsb < 0 || y.lsb < 0)) || productWraps ||
             ((isDiv || x.lsb < 0 || y.lsb < 0) && (integerMayWrap(x) || integerMayWrap(y))) ||
             (isDiv && !y.isConst()) || x.isConst() == y.isConst() || drifts) {
             return collapse(x.moving() || y.moving(), [&](auto hull) { return op(hull(x), hull(y)); });
