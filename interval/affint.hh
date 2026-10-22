@@ -58,11 +58,19 @@ struct AffItv {
         result.mayBeInvalid = mayBeInvalid || possible;
         return result;
     }
-    // Public API: monotonically add a possible overflow without changing the corridor.
+    // Public API: monotonically add a possible overflow. An int32 value that may wrap may
+    // hold any int32 value once it has wrapped : both its bounds move past the horizon.
     AffItv withOverflow(bool possible = true) const
     {
         AffItv result = *this;
         result.mayOverflow = mayOverflow || possible;
+        return result.wrapDrift();
+    }
+    // Public API: an int32 value that may wrap drifts on both sides.
+    AffItv wrapDrift() const
+    {
+        AffItv result = *this;
+        if (result.lsb >= 0 && result.mayOverflow) result.loDrifts = result.hiDrifts = true;
         return result;
     }
 
@@ -122,7 +130,7 @@ inline AffItv aempty()
 inline AffItv fromItv(const interval& x)
 {
     // Empty numeric bounds can still carry invalid execution and its nature.
-    return {x.lo(), 0, x.hi(), 0, x.lsb(), x.mayBeInvalid(), x.mayOverflow()};
+    return AffItv{x.lo(), 0, x.hi(), 0, x.lsb(), x.mayBeInvalid(), x.mayOverflow()}.wrapDrift();
 }
 
 /// Collapse to the ordinary interval hull over [0, T] — THE bridge from affine claims

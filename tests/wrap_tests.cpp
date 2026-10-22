@@ -203,6 +203,16 @@ void growthTests()
           aleq(sq, C(-1e10, 1e10), T));
     // a fixed corridor stays valid for all time
     check("growth : a fixed corridor does not move", false, F.Add(C(0, 10), C(0, 10)).moving());
+    // an int32 value that may wrap may hold any int32 value once it has wrapped : it moves on
+    // both sides, and the operations after it, through a delay, may wrap in turn
+    const AffItv w = F.Add(slow, C(1, 1));
+    check("wrap : a counter plus one that may wrap drifts on both sides", true, w.loDrifts && w.hiDrifts);
+    check("wrap : then minus one may wrap", true, F.Sub(w, C(1, 1)).mayOverflow);
+    check("wrap : then delayed, minus two may wrap", true, F.Sub(F.Delay(w, C(1, 1)), C(2, 2)).mayOverflow);
+    check("wrap : then negated may wrap", true, F.Neg(w).mayOverflow);
+    const AffItv k = F.Add(C(M, M), C(1, 1));
+    check("wrap : a constant that wraps moves", true, k.mayOverflow && k.moving());
+    check("wrap : a fixed corridor that cannot wrap does not drift", false, F.Add(C(0, 10), C(0, 10)).loDrifts);
 }
 
 }  // namespace

@@ -1286,7 +1286,7 @@ class AffineOps : public Base {
         r.lsb         = std::min(r0.lsb(), rT.lsb());
         // an int32 product may wrap on the values of its operands for all time
         r.mayOverflow = r.lsb >= 0 && op(forever(x, fT), forever(y, fT)).mayOverflow();
-        return r;
+        return r.wrapDrift();
     }
 
     /// x delayed by at least nlo samples, with a positive delay still possible,
