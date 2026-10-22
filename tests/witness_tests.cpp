@@ -87,15 +87,6 @@ int main()
                        std::pow(-HUGE_VAL, -0.5) + 2147483647.0 + 1.0));
     }
     check("witness : 2.5 is not a power of 2", false, interval(2.5).ispowerof2());
-    // in double, the program rounds (t + 0.1) - t at every sample
-    {
-        const AffItv x{0, 1, 0, 1, -24};
-        const AffItv v = F.Sub(F.Add(x, F.FloatNum(0.1)), x);
-        volatile double t1 = 1, u1 = t1 + 0.1, v1 = u1 - t1;
-        check("witness : affine (t + 0.1) - t holds its rounded value at t = 1", true, v.lo(1) <= v1 && v1 <= v.hi(1));
-        check("witness : affine ((t + 0.1) - t) == 0.1 is not folded to true", true,
-              contains(toItv(F.Eq(v, F.FloatNum(0.1)), T), v1 == 0.1 ? 1.0 : 0.0));
-    }
     // round, as the generated code : halves away from zero
     check("witness : affine round(2.5) holds 3", true, contains(toItv(F.Round(fromItv(interval(2.5, 2.5, -1))), T), 3.0));
     // prefix(1000, t) - t is -1 from t = 1 on

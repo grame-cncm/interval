@@ -223,10 +223,8 @@ int main()
         check("affine: interior zero crossing covers both infinities", true,
               pole.lo(5) == -HUGE_VAL && pole.hi(5) == HUGE_VAL);
         const AffItv linear = shortHorizon.Div({2, 2, 2, 2, -24}, fromItv(interval(2.0)));
-        // the rate is kept ; the ends widen by the rounding of the program in double
         check("affine: constant denominator preserves the numerator rate", true,
-              linear.a1 == 1 && linear.b1 == 1 && linear.a0 <= 1 && linear.b0 >= 1 &&
-                  linear.b0 - linear.a0 < 1e-12);
+              linear.a0 == 1 && linear.b0 == 1 && linear.a1 == 1 && linear.b1 == 1);
     }
 
     // ---- the precision of the program (programPrecision, programBound, ulpMargin) ----
