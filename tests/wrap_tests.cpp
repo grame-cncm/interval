@@ -259,6 +259,14 @@ void growthTests()
     const AffItv mt = meetDrift(C(0, 10), fixed, rising);
     check("rebuild : the meet with a fixed bound does not drift", false, mt.hiDrifts);
     check("rebuild : the meet of two rising bounds drifts", true, meetDrift(C(0, 10), rising, rising).hiDrifts);
+
+    // a coefficient null over [0, T] that moves past it still counts
+    AffItv zeroNow = C(0, 0);
+    zeroNow.hiDrifts = true;
+    const AffItv fir = F.Fir(C(1, 1), {C(1, 1), zeroNow});
+    check("fir : a null coefficient that drifts makes the sum drift", true, fir.hiDrifts);
+    check("fir : a null coefficient that does not drift adds nothing", false,
+          F.Fir(C(1, 1), {C(1, 1), C(0, 0)}).hiDrifts);
 }
 
 }  // namespace
