@@ -12,18 +12,19 @@ Herrou, Stéphane Letz.
 ## In short
 
 These intervals enclose the values **the program computes**, not the values of the
-mathematical functions. Faust's normal form rewrites the program with real semantics.
-What remains runs in the program's precision, under one execution model:
+mathematical functions. Faust computes on the reals ; the program's precision (single or
+double) trades accuracy for speed. What the compiler computes itself, a constant folded
+at compile time, it computes as exactly as possible, and rounds to the program's
+precision only when it writes it into the code. What it proves about the execution holds
+for every possible execution of the program in its precision, under one execution model:
 
 - basic operations (+ − × /, sqrt, comparisons, conversions) round to nearest in the
   program's precision;
 - libm functions are within 2 ulps of the exact result;
 - the C++ compiler may contract a × b + c into an FMA.
 
-One doctrine follows: *what the compiler computes is a possible execution; what it
-proves holds for every possible execution.* A constant folded at compile time is the
-value the program computes. An interval contains every value any execution may produce.
-A guard is removed only when the interval proves it, on every machine.
+An interval contains every value any execution may produce. A guard is removed only when
+the interval proves it, on every machine.
 
 Unlike a classic interval library (IEEE 1788, Boost.Interval, MPFI), which encloses real
 results, this library therefore:
