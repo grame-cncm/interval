@@ -9,6 +9,33 @@ fixpoint engine running over these algebras.
 Licensed under Apache-2.0 (see LICENSE). Copyright 2020-2026 Yann Orlarey, Agathe
 Herrou, Stéphane Letz.
 
+## In short
+
+These intervals enclose the values **the program computes**, not the values of the
+mathematical functions. Faust's normal form rewrites the program with real semantics.
+What remains runs in the program's precision, under one execution model:
+
+- basic operations (+ − × /, sqrt, comparisons, conversions) round to nearest in the
+  program's precision;
+- libm functions are within 2 ulps of the exact result;
+- the C++ compiler may contract a × b + c into an FMA.
+
+One doctrine follows: *what the compiler computes is a possible execution; what it
+proves holds for every possible execution.* A constant folded at compile time is the
+value the program computes. An interval contains every value any execution may produce.
+A guard is removed only when the interval proves it, on every machine.
+
+Unlike a classic interval library (IEEE 1788, Boost.Interval, MPFI), which encloses real
+results, this library therefore:
+
+- has one implementation per precision: single and double, with quad analyzed with the
+  double model;
+- tracks validity, a possible NaN or undefined operation;
+- works on signals: affine-in-time corridors, fixpoints of recursions, certified
+  durations;
+- has compound nodes (mix, frac, IIR gains) with rules tighter than the composition of
+  their operations.
+
 ## The two roles of the interval computation
 
 - **Correctness** — the program runs right: delay lines sized from provable bounds,
