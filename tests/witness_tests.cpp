@@ -123,6 +123,15 @@ int main()
         check("witness : affine double accumulator is stationary", true, done && std::isfinite(y.b0) && y.b1 > 0);
         check("witness : affine double accumulator holds the rounded sums", true, in);
     }
+    // in quad precision, exp of an unbounded value reaches +inf and stays a real
+    {
+        const int saved    = programPrecision();
+        programPrecision() = 3;
+        const interval e   = A.Exp(interval(-HUGE_VAL, HUGE_VAL, -24));
+        programPrecision() = saved;
+        check("witness : quad exp of an unbounded value holds +inf", true, contains(e, HUGE_VAL));
+        check("witness : quad exp of an unbounded value stays a real", true, e.lsb() < 0);
+    }
     // round, as the generated code : halves away from zero
     check("witness : affine round(2.5) holds 3", true, contains(toItv(F.Round(fromItv(interval(2.5, 2.5, -1))), T), 3.0));
     // prefix(1000, t) - t is -1 from t = 1 on
