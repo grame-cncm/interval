@@ -2,13 +2,24 @@ These notes on testing the intervals results are destined to future library cont
 
 # Test suites
 
-The project has seven dependency-free regression executables and four optional
-oracle targets, plus the experimental `TestInterval` program:
+The project has twelve dependency-free regression executables, all run by CTest, and
+four optional oracle targets:
 
 - `IntervalTests` contains fast, deterministic regression tests. It checks interval bounds and
   LSB values strictly and is the suite executed by CTest and CI.
-- `TestInterval` is an experimental numerical-analysis program. It can run large sampled studies
-  of interval operations and is not part of the default CTest suite.
+- `ExecutionModelTests` checks the execution model of the README, one rule at a time, in
+  single and double precision : basic operations rounded to nearest in the program's
+  precision, libm results within 2 ulps of the exact one, a * b + c rounded twice or fused.
+- `KernelTests` checks the kernels Sum, Fir and Iir : the certified gain of a recursive
+  filter against independent references, the refusal of unstable filters, and the
+  inclusion of the values a program computes.
+- `CompoundTests` checks the compound operations Frac, Cfrac, Mix, Tpt and Irm : precision
+  of the bounds, inclusion of the computed values (with and without a fused multiply-add),
+  and validity.
+- `WrapTests` checks the int32 operations, which wrap in two's complement : the interval of
+  a result is the set of values after the wrap, and mayOverflow says whether it may wrap.
+- `WitnessTests` holds one check per defect found by a review of the library : the value
+  the compiled program produces must lie in the interval.
 - `DirectedBoundsTests` contains dependency-free rounding regressions, including
   half-ULP errors, false singleton underflow, overflow, exact constants, poles,
   affine interpolation, and preservation of the host rounding mode. It also runs

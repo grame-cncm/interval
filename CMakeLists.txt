@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 # set the project name
-project(TestInterval LANGUAGES CXX)
+project(Interval LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -42,10 +42,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 elseif(MSVC)
     target_compile_options(interval PUBLIC /fp:strict)
 endif()
-
-# Experimental and numerical analysis executable.
-add_executable(TestInterval main.cpp)
-target_link_libraries(TestInterval PRIVATE interval)
 
 # Fast deterministic regression tests used by CTest and CI.
 add_executable(IntervalTests tests/interval_tests.cpp)
@@ -105,6 +101,9 @@ target_link_libraries(WrapTests PRIVATE interval)
 add_executable(WitnessTests tests/witness_tests.cpp)
 set_target_properties(WitnessTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(WitnessTests PRIVATE interval)
+add_executable(ExecutionModelTests tests/execution_model_tests.cpp)
+set_target_properties(ExecutionModelTests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(ExecutionModelTests PRIVATE interval)
 
 enable_testing()
 add_test(NAME interval_unit_tests COMMAND IntervalTests)
@@ -120,6 +119,7 @@ add_test(NAME compound_tests COMMAND CompoundTests)
 add_test(NAME kernel_tests COMMAND KernelTests)
 add_test(NAME wrap_tests COMMAND WrapTests)
 add_test(NAME witness_tests COMMAND WitnessTests)
+add_test(NAME execution_model_tests COMMAND ExecutionModelTests)
 
 if(INTERVAL_ENABLE_MPFR_TESTS)
     find_package(PkgConfig QUIET)
