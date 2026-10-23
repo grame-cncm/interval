@@ -8,6 +8,7 @@
 #include "interval/interval_algebra.hh"
 #include "interval/affine_ops.hh"
 #include "interval/affint.hh"
+#include "interval/double_double.hh"
 #include "interval/interval_def.hh"
 
 using namespace itv;
@@ -349,6 +350,26 @@ int main()
         }
 
         programPrecision() = saved;
+    }
+
+    // ---- double-double : a computation at compile time, rounded once ----
+    {
+        const DoubleDouble c = ddAdd(ddAdd({-1.0, 0.0}, {0.1, 0.0}), {1.0, 0.0});
+        check("double-double : -1 + 0.1 + 1 rounds to 0.1", true, c.hi == 0.1);
+        DoubleDouble sum;
+        double       plain = 0.0;
+        for (int k = 0; k < 10; k++) {
+            sum = ddAdd(sum, {0.1, 0.0});
+            plain += 0.1;
+        }
+        check("double-double : ten times 0.1 rounds to 1 (a double sum gives 0.9999999999999999)", true,
+              sum.hi == 1.0 && plain != 1.0);
+        const DoubleDouble p = ddMul({1.0 + 0x1p-30, 0.0}, {1.0 - 0x1p-30, 0.0});
+        check("double-double : (1 + 2^-30)(1 - 2^-30) is 1 - 2^-60 exactly", true, p.hi == 1.0 && p.lo == -0x1p-60);
+        const DoubleDouble q = ddMul(ddDiv({1.0, 0.0}, {3.0, 0.0}), {3.0, 0.0});
+        check("double-double : (1 / 3) * 3 rounds to 1", true, q.hi == 1.0);
+        const DoubleDouble i = ddAdd({HUGE_VAL, 0.0}, {1.0, 0.0});
+        check("double-double : an infinity has no error term", true, i.hi == HUGE_VAL && i.lo == 0.0);
     }
 
     return reportCheckResults();
