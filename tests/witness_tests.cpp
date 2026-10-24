@@ -270,8 +270,12 @@ int main()
               contains(A.Log(A.FloatNum(0x1.0f2ebd0a80028p+23)), 0x1.ffffffffffffdp+3));
         check("witness : double asinh at 1.960 ulps below 32", true,
               contains(A.Asinh(A.FloatNum(0x1.1f43fcc4b663dp+45)), 0x1.ffffffffffffdp+4));
-        check("witness : double sin at 1 ulp above 1", true,
-              contains(A.Sin(A.FloatNum(0x1.921fb54442d19p+0)), 0x1.0000000000001p+0));
+        // cosh(tiny) is just above 1 : 1 - 3 * 2^-53 is 1.5 ulps below it (sin, whose exact
+        // result stays below 1, stays within 1 : 1 + 2^-52 is more than 2 ulps of the binade
+        // below away from it)
+        check("witness : double cosh at 1.5 ulps below 1", true,
+              contains(A.Cosh(A.FloatNum(0x1p-30)), 1 - 3 * 0x1p-53));
+        check("witness : double sin stays within 1", true, A.Sin(A.FloatNum(0x1.921fb54442d19p+0)).hi() == 1);
         programPrecision() = 1;
         check("witness : float exp at 1.984 ulps below 1/2", true,
               contains(A.Exp(A.FloatNum(-0x1.62e42ep-1)), 0x1.fffffap-2));

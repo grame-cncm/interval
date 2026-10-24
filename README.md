@@ -276,8 +276,10 @@ floating functions retain a negative LSB, so later operations cannot wrap as int
 `*Bounds` provides a conservative mathematical reference, independently of the
 target libm. Public transcendental operations widen each bound of that reference by
 2 ulps of its binade when `libmCompensation()` is enabled, and the image of the
-function by the same margin (sin is at most 1 + 2 ulp(1)) ; a bound of exactly 0
-stays, by annex F of the C standard. Inclusion of **executed libm values** therefore
+function by the same margin (cosh is at least 1 - 2 ulp(1)), except a power of two on the
+side of smaller magnitudes, which the exact result reaches only where the libm is exact
+(sin, cos and tanh stay within [-1, 1]) ; a bound of exactly 0 stays, by annex F of the
+C standard. Inclusion of **executed libm values** therefore
 requires a target libm within 2 ulps of the exact result, the error that libms
 publish. Disabling the margin requires a correctly-rounded target. This distinction
 applies equally to float and double. `mayBeInvalid` separately records possible

@@ -329,9 +329,9 @@ int main()
             float  up2 = std::nextafter(std::nextafter(float(raw.hi()), 2.0f), 2.0f);
             check("libm: sin widens its upper bound by 2 float ulps", true, s.hi() == double(up2));
             check("libm: sin keeps its exact 0 bound", true, s.lo() == 0);
-            // the image [-1, 1] bounds the exact result : the value is within 2 ulps of it
-            check("libm: the image of sin, widened by 2 ulps, caps the widening", true,
-                  algebra.Sin(interval(0, 7)).hi() == 1 + 0x1p-22 && algebra.Sin(interval(0, 7)).lo() == -(1 + 0x1p-22));
+            // the exact sin stays below 1, in the binade below : 2 ulps of it stay within 1
+            check("libm: the image of sin caps the widening", true,
+                  algebra.Sin(interval(0, 7)).hi() == 1 && algebra.Sin(interval(0, 7)).lo() == -1);
             check("libm: a runtime point receives an enclosure", true,
                   !algebra.Sin(algebra.FloatNum(0.5)).isconst());
             check("libm: exp stays >= 0", true, algebra.Exp(interval(-200, 0)).lo() >= 0);
