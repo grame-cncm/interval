@@ -142,5 +142,81 @@ int main()
         const AffItv e = F.Sub(F.RDTbl(w, F.IntNum(0)), counter);
         check("witness : a table cell written at 0 read at 500, minus t, holds -500", true, contains(toItv(e, T), -500.0));
     }
+    // --- second review ---
+    // the join is idempotent : a double accumulator driven through FixPointUpdate is stationary
+    {
+        AffItv y    = aempty();
+        bool   done = false;
+        for (int it = 1; !done && it <= 200; it++) {
+            AffItv f = F.FixPointUpdate(y, F.Add(F.Mem(y), F.FloatNum(0.1)));
+            if (it > 8) f = awiden(y, f, T);
+            done = !y.isEmpty() && aleq(f, y, T);
+            y    = f;
+        }
+        const AffItv j = ajoin(y, y, T);
+        check("witness : a joined double accumulator is stationary", true, done);
+        check("witness : ajoin(y, y) is y", true, j.a0 == y.a0 && j.a1 == y.a1 && j.b0 == y.b0 && j.b1 == y.b1);
+    }
+    // a widening holds fresh : the int recursion y = y' + y' + 1000 wraps, and its fixpoint holds
+    // the wrapped value at t = 21
+    {
+        const double         T64 = 64;
+        const affine_algebra F64(T64);
+        AffItv               y    = aempty();
+        bool                 done = false;
+        for (int it = 1; !done && it <= 100; it++) {
+            AffItv f = F64.Add(F64.Add(F64.Mem(y), F64.Mem(y)), F64.IntNum(1000));
+            if (it > 8) f = awiden(y, f, T64);
+            done = !y.isEmpty() && aleq(f, y, T64);
+            y    = f;
+        }
+        std::int32_t v = 1000;
+        for (int t = 1; t <= 21; t++) v = wrapAdd(wrapAdd(v, v), 1000);
+        check("witness : the fixpoint of y = 2 y' + 1000 (int) holds its wrapped value", true,
+              done && contains(toItv(y, T64), double(v)));
+    }
+    // a widening never narrows the side that does not widen : y = -(y' + [89041, 91976]) settles
+    {
+        const double         T20 = 20;
+        const affine_algebra F20(T20);
+        const AffItv         c    = fromItv(interval(89041, 91976, 0));
+        AffItv               y    = aempty();
+        bool                 done = false;
+        for (int it = 1; !done && it <= 200; it++) {
+            AffItv f = F20.Neg(F20.Add(F20.Mem(y), c));
+            if (it > 8) f = awiden(y, f, T20);
+            done = !y.isEmpty() && aleq(f, y, T20);
+            y    = f;
+        }
+        check("witness : y = -(y' + [89041, 91976]) (int) settles", true, done);
+    }
+    // the meet set by a moving bound moves : [0, 100] meet min(t, 100) holds 11 at t = 11
+    {
+        const double         T10 = 10;
+        const affine_algebra F10(T10);
+        const AffItv         a = fromItv(interval(0, 100, -24));
+        const AffItv         b = F10.Min(AffItv{0, 0, 0, 1, -24}, F10.FloatNum(100));
+        const AffItv         r = meetDrift(fromItv(intersection(toItv(a, T10), toItv(b, T10))), a, b, T10);
+        check("witness : a meet set by a rising bound holds its value past T", true, contains(forever(r, T10), 11.0));
+    }
+    // a leaky integrator y = 0.999 y' + 1 keeps a finite corridor
+    {
+        AffItv y    = aempty();
+        bool   done = false;
+        for (int it = 1; !done && it <= 100; it++) {
+            AffItv f = F.Add(F.Mul(F.Delay(y, F.IntNum(1)), F.FloatNum(0.999)), F.FloatNum(1.0));
+            if (it > 8) f = awiden(y, f, T);
+            done = !y.isEmpty() && aleq(f, y, T);
+            y    = f;
+        }
+        volatile double acc = 0;
+        bool            in  = true;
+        for (int t = 1; t <= T; t++) {
+            acc = acc * 0.999 + 1.0;
+            in  = in && y.lo(t) <= acc && acc <= y.hi(t);
+        }
+        check("witness : a leaky integrator keeps a finite corridor", true, done && std::isfinite(y.b0));
+        check("witness : a leaky integrator corridor holds the program", true, in);
+    }
     return reportCheckResults();
 }

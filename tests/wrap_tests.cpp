@@ -252,13 +252,21 @@ void growthTests()
     check("probe : a larger image is not within the seed", false, aleqWithin(C(0, 32), seed, T));
 
     // a corridor rebuilt from hulls : between moving values it drifts where they move ; as
-    // the meet of two bounds, only where both move
+    // the meet of two bounds, where the bound that sets it moves
     const AffItv fixed = C(0, 10), rising{0, 0, 0, 1, -24};
     const AffItv h = hullDrift(C(0, 20), {fixed, rising});
     check("rebuild : between a fixed and a rising value, the upper bound drifts", true, h.hiDrifts && !h.loDrifts);
-    const AffItv mt = meetDrift(C(0, 10), fixed, rising);
-    check("rebuild : the meet with a fixed bound does not drift", false, mt.hiDrifts);
-    check("rebuild : the meet of two rising bounds drifts", true, meetDrift(C(0, 10), rising, rising).hiDrifts);
+    const AffItv mt = meetDrift(C(0, 10), fixed, rising, T);
+    check("rebuild : the meet set by a fixed bound does not drift", false, mt.hiDrifts);
+    check("rebuild : the meet of two rising bounds drifts", true, meetDrift(C(0, 10), rising, rising, T).hiDrifts);
+    // set by the rising bound (min(t, 100) is [0, 10] over [0, 10]), the meet rises with it
+    {
+        const double         T10 = 10;
+        const affine_algebra F10(T10);
+        const AffItv         wide = C(0, 100), climbing = F10.Min(rising, F10.FloatNum(100));
+        check("rebuild : the meet set by a rising bound drifts", true,
+              meetDrift(fromItv(intersection(toItv(wide, T10), toItv(climbing, T10))), wide, climbing, T10).hiDrifts);
+    }
 
     // a coefficient null over [0, T] that moves past it still counts
     AffItv zeroNow = C(0, 0);
