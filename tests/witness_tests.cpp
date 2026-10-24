@@ -157,6 +157,11 @@ int main()
         const AffItv j = ajoin(y, y, T);
         check("witness : a joined double accumulator is stationary", true, done);
         check("witness : ajoin(y, y) is y", true, j.a0 == y.a0 && j.a1 == y.a1 && j.b0 == y.b0 && j.b1 == y.b1);
+        // a join that returns the larger corridor keeps the finer precision : a float zero
+        // joined to an int-stamped seed is a float
+        const AffItv seed = fromItv(interval(-HUGE_VAL, 16777216.0, 0));
+        check("witness : a join within a corridor keeps the finer precision", true,
+              ajoin(seed, F.FloatNum(0.0), T).lsb < 0);
     }
     // a widening holds fresh : the int recursion y = y' + y' + 1000 wraps, and its fixpoint holds
     // the wrapped value at t = 21

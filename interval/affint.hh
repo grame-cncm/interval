@@ -313,10 +313,14 @@ inline AffItv ajoin(const AffItv& x, const AffItv& y, double T)
     if (x.isEmpty()) return adrift(y.withInvalid(invalid).withOverflow(overflow), x);
     if (y.isEmpty()) return adrift(x.withInvalid(invalid).withOverflow(overflow), y);
     // one corridor within the other, over [0, T] (aleq) and for all time (forever), is the
-    // join : the chords, rounded outward, would move its bounds by an ulp at each join of an
-    // iteration
-    if (aleq(y, x, T) && forever(y, T) <= forever(x, T)) return x;
-    if (aleq(x, y, T) && forever(x, T) <= forever(y, T)) return y;
+    // join, at the finer precision of the two : the chords, rounded outward, would move its
+    // bounds by an ulp at each join of an iteration
+    auto larger = [&](AffItv r) {
+        r.lsb = std::min(x.lsb, y.lsb);
+        return adrift(adrift(r, x), y).withInvalid(invalid).withOverflow(overflow);
+    };
+    if (aleq(y, x, T) && forever(y, T) <= forever(x, T)) return larger(x);
+    if (aleq(x, y, T) && forever(x, T) <= forever(y, T)) return larger(y);
     AffItv r;
     achord(std::min(x.lo(0), y.lo(0)), std::min(x.lo(T), y.lo(T)), T, r.a0, r.a1);
     achord(std::max(x.hi(0), y.hi(0)), std::max(x.hi(T), y.hi(T)), T, r.b0, r.b1, true);
