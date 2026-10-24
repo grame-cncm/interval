@@ -309,5 +309,15 @@ int main()
         check("witness : a recursion adding a float subnormal settles", true, done && contains(toItv(r, 10), 0.0));
         programPrecision() = saved;
     }
+    // a probe seed certified over [0, T] only drifts : the image of y = select2(sel, 10 - y',
+    // c), c = t, from the seed [0, 10] holds -10, the value of the program at t = 21
+    {
+        const affine_algebra F5(5);
+        const AffItv         sel   = F5.Checkbox(F5.Label("sel"));
+        const AffItv         seed  = probeSeed(interval(0, 10, -24));
+        const AffItv         image = F5.Select2(sel, F5.Sub(F5.FloatNum(10), F5.Mem(seed)), AffItv{0, 0, 0, 1, -24});
+        check("witness : the image of a probe seed is within it over [0, T]", true, aleqWithin(image, seed, 5));
+        check("witness : the image of a probe seed holds the program past T", true, contains(forever(image, 5), -10.0));
+    }
     return reportCheckResults();
 }
