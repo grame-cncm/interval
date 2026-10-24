@@ -260,5 +260,24 @@ int main()
         check("witness : a subnormal ddMul is the rounded product", true,
               ddMul({0x1.352c06d3f408bp-512, 0}, {0x1.18938fc7c6d0ap-508, 0}).hi == 0x1.52da5d649bc45p-1020);
     }
+    // the libm within 2 ulps of the exact result, the ulp of its binade : just above a power
+    // of two, 4 floats below it ; the image widened by 2 ulps (values at 1.9 to 1.98 ulps,
+    // checked at 300 bits)
+    {
+        const int saved = programPrecision();
+        programPrecision() = 2;
+        check("witness : double log at 1.955 ulps below 16", true,
+              contains(A.Log(A.FloatNum(0x1.0f2ebd0a80028p+23)), 0x1.ffffffffffffdp+3));
+        check("witness : double asinh at 1.960 ulps below 32", true,
+              contains(A.Asinh(A.FloatNum(0x1.1f43fcc4b663dp+45)), 0x1.ffffffffffffdp+4));
+        check("witness : double sin at 1 ulp above 1", true,
+              contains(A.Sin(A.FloatNum(0x1.921fb54442d19p+0)), 0x1.0000000000001p+0));
+        programPrecision() = 1;
+        check("witness : float exp at 1.984 ulps below 1/2", true,
+              contains(A.Exp(A.FloatNum(-0x1.62e42ep-1)), 0x1.fffffap-2));
+        check("witness : float log at 1.981 ulps below 1", true,
+              contains(A.Log(A.FloatNum(0x1.5bf0aap+1)), 0x1.fffffap-1));
+        programPrecision() = saved;
+    }
     return reportCheckResults();
 }
