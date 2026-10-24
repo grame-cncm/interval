@@ -218,5 +218,24 @@ int main()
         check("witness : a leaky integrator keeps a finite corridor", true, done && std::isfinite(y.b0));
         check("witness : a leaky integrator corridor holds the program", true, in);
     }
+    // a filter of null float coefficients is a float zero : fir(0.5, {0.0}) - INT_MIN is 2^31
+    {
+        const affine_algebra F10(10);
+        const AffItv         r = F10.Sub(F10.Fir(F10.FloatNum(0.5), {F10.FloatNum(0.0)}), F10.IntNum(INT32_MIN));
+        check("witness : fir(0.5, {0.0}) - INT_MIN holds 2^31", true, contains(toItv(r, 10), 2147483648.0));
+        check("witness : interval fir of a null float coefficient is a float", true,
+              A.Fir(A.FloatNum(0.5), {A.FloatNum(0.0)}).lsb() < 0);
+    }
+    // a delayed bound collapsed to a constant still moves past the horizon
+    {
+        const AffItv cross{-1610612736.0, 1, -1610612736.0, 1, -24};
+        check("witness : mem of a rising lower bound moves past T", true, contains(forever(F.Mem(cross), T), -2e9));
+    }
+    // a table cell holds its generator at its index, past the horizon too
+    {
+        const affine_algebra F10(10);
+        const AffItv         w = F10.WRTbl(F10.IntNum(100), F10.Gen(AffItv{0, 0, 0, 1, -24}), F10.IntNum(0), F10.FloatNum(0));
+        check("witness : rdtable(100, g = t, 99) holds 99", true, contains(toItv(F10.RDTbl(w, F10.IntNum(99)), 10), 99.0));
+    }
     return reportCheckResults();
 }

@@ -15,6 +15,14 @@
 #include "double_double.hh"
 
 #include <cmath>
+#include <cfloat>
+
+// The error-free transformations and the directed bounds assume that each double operation
+// rounds once, to a double : an extended evaluation (x87, FLT_EVAL_METHOD 1 or 2) keeps
+// intermediates wider and rounds them twice.
+#if !defined(FLT_EVAL_METHOD) || FLT_EVAL_METHOD != 0
+#error "the interval library needs FLT_EVAL_METHOD == 0 (SSE2 on x86 : -msse2 -mfpmath=sse)"
+#endif
 
 namespace itv {
 
