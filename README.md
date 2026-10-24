@@ -23,7 +23,11 @@ for every possible execution of the program in its precision, under one executio
 - libm functions are within 2 ulps of the exact result, the ulp of the exact result in
   its binade (just above a power of two, 2 ulps reach 4 floats below it), and exact where
   the C standard requires it (sin(±0) = ±0, log(1) = 0...);
-- the C++ compiler may contract a × b + c into an FMA.
+- the C++ compiler may contract a × b + c into an FMA;
+- a subnormal result or operand may be replaced by zero : audio hosts and Faust's
+  architecture files enable flush-to-zero and denormals-are-zero, because subnormals are
+  very slow on many processors (the tail of a reverb made of subnormals costs a lot of
+  CPU to compute silence).
 
 An interval contains every value any execution may produce. A guard is removed only when
 the interval proves it, on every machine.
@@ -456,11 +460,21 @@ ctest --test-dir build-wasm --output-on-failure
 The CMake target disables fast-math and implicit contraction for the analyzer
 and its header-based helpers. Direct consumers must preserve this compilation
 contract as well. The kernel does not change the CPU rounding mode and has no
-mutable numerical state. IEEE gradual underflow is required (FTZ/DAZ disabled
-in the analyzer); target FTZ/DAZ remains a separate model. Only the optional
+mutable numerical state. The analyzer itself computes with IEEE gradual underflow
+(FTZ/DAZ disabled in its own computations). The program it analyzes may flush
+subnormals to zero, which the execution model covers (see In short). Faust's `-ftz 1`
+and `-ftz 2` options flush the recursive signals in the code itself, for targets that
+keep subnormals, such as WebAssembly ; the interval computation sees that code like any
+other. Only the optional
 oracle needs a thread-safe MPFR build or caller serialization if used concurrently.
 
 ## Special intervals
+
+The bounds of an interval are read in the total order of IEEE 754, where -0 lies before
++0 : a lower bound -0 holds both zeros, a lower bound +0 holds +0 only ; an upper bound
++0 holds both zeros, an upper bound -0 holds -0 only. Each operation gives its zero
+bounds the signs IEEE arithmetic gives them, so a value known to be +0 or positive keeps
+a positive reciprocal : a positive subnormal flushed to zero is +0.
 
 Division computes the four endpoint quotients directly, avoiding the extra rounding
 of multiplication by a reciprocal. If the denominator contains zero, or an endpoint
