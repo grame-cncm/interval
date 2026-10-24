@@ -512,6 +512,21 @@ inline bool operator>(const interval& i, const interval& j)
 }
 
 /**
+ * r for a program that may flush subnormals to zero (FTZ, and DAZ for its operands) : a bound
+ * strictly between 0 and the smallest normal of the model's precision is 0. Audio hosts and
+ * Faust's architecture files enable both, subnormals being very slow on many processors.
+ */
+inline interval flushedToZero(const interval& r)
+{
+    if (r.isEmpty() || r.lsb() >= 0) return r;
+    const double m  = modelPrecision() == 1 ? 0x1p-126 : 0x1p-1022;
+    const double lo = (r.lo() > 0 && r.lo() < m) ? 0.0 : r.lo();
+    const double hi = (r.hi() < 0 && r.hi() > -m) ? 0.0 : r.hi();
+    if (lo == r.lo() && hi == r.hi()) return r;
+    return interval(lo, hi, r.lsb(), r.mayBeInvalid()).withOverflow(r.mayOverflow()).withMotion(r.loMoves(), r.hiMoves());
+}
+
+/**
  * The bounds of a libm function, compensated : the libm returns a value within 2 ulps of the
  * exact result, the ulp of the exact result in its binade (the spacing of the floats of the
  * program's precision between the powers of two around it). Just above a power of two, 2

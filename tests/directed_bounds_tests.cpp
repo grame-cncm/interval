@@ -78,10 +78,11 @@ int main()
           algebra.Mul(interval(tiny, tiny, -1074), interval(0.75)) == interval(0, tiny));
     check("double: negative inexact subnormal product is bracketed", true,
           algebra.Mul(interval(-tiny, -tiny, -1074), interval(0.75)) == interval(-tiny, 0));
-    check("double: an exact subnormal product stays a singleton", true,
-          algebra.Mul(interval(2 * tiny, 2 * tiny, -1074), interval(0.5)).is(tiny));
-    check("double: an exact subnormal quotient stays a singleton", true,
-          algebra.Div(interval(2 * tiny, 2 * tiny, -1074), interval(2, 2, -24)).is(tiny));
+    // an exact subnormal result, or the zero a flush to zero makes of it (FTZ, DAZ)
+    check("double: an exact subnormal product is itself or a flushed zero", true,
+          algebra.Mul(interval(2 * tiny, 2 * tiny, -1074), interval(0.5)) == interval(0, tiny));
+    check("double: an exact subnormal quotient is itself or a flushed zero", true,
+          algebra.Div(interval(2 * tiny, 2 * tiny, -1074), interval(2, 2, -24)) == interval(0, tiny));
     check("double: negative overflow keeps max-finite above -inf", true,
           algebra.Mul(interval(-largest, -largest, -24), interval(2, 2, -24))
               == interval(-HUGE_VAL, -largest));
@@ -91,8 +92,12 @@ int main()
     check("double: large singleton trig inputs use an explicit conservative fallback", true,
           algebra.SinBounds(interval(1e100)) == interval(-1, 1) &&
           algebra.CosBounds(interval(1e100)) == interval(-1, 1));
-    check("double: fmod with a huge quotient is exactly representable", true,
-          algebra.Fmod(algebra.FloatNum(largest), algebra.FloatNum(3 * tiny)).is(2 * tiny));
+    // the subnormal divisor may be read as 0 (DAZ) : fmod by 0 is a NaN
+    {
+        const interval r = algebra.Fmod(algebra.FloatNum(largest), algebra.FloatNum(3 * tiny));
+        check("double: fmod with a huge quotient is exact, or a flushed zero", true,
+              r.lo() == 0 && r.hi() == 2 * tiny && r.mayBeInvalid());
+    }
     using namespace itv::detail;
     check("double: scalar IEEE remainder uses ties-to-even", true,
           directedBinary(BinaryOp::Remainder, 3, 2, Direction::Down) == -1 &&

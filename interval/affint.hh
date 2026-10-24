@@ -194,6 +194,24 @@ inline interval hullWithMotion(const AffItv& x, double T)
     return h.withMotion(all.lo() < h.lo(), all.hi() > h.hi());
 }
 
+/// r for a program that may flush subnormals to zero (see flushedToZero of an interval) : a
+/// bound line whose extreme over [0, T] lies strictly between 0 and the smallest normal is
+/// shifted to reach 0 there. A line that crosses 0 already holds 0 in its hull over [0, T].
+/// Idempotent : a shifted line reaches 0, out of the band.
+inline AffItv flushedToZero(AffItv r, double T)
+{
+    if (r.isEmpty() || r.lsb >= 0) return r;
+    const double m  = modelPrecision() == 1 ? 0x1p-126 : 0x1p-1022;
+    const double lo = std::min(r.lo(0), r.lo(T)), hi = std::max(r.hi(0), r.hi(T));
+    if (lo > 0 && lo < m) {
+        r.a0 = (r.a1 == 0) ? 0.0 : detail::directedBinary(detail::BinaryOp::Sub, r.a0, lo, detail::Direction::Down);
+    }
+    if (hi < 0 && hi > -m) {
+        r.b0 = (r.b1 == 0) ? 0.0 : detail::directedBinary(detail::BinaryOp::Sub, r.b0, hi, detail::Direction::Up);
+    }
+    return r;
+}
+
 /// Public API: prove x ⊑ y over [0,T], T>=0, by comparing exact affine lines at
 /// both endpoints. In float/double mode an upward enclosure of each difference must
 /// be nonpositive; comparing two separately rounded values could give a false proof.

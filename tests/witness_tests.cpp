@@ -283,5 +283,31 @@ int main()
               contains(A.Log(A.FloatNum(0x1.5bf0aap+1)), 0x1.fffffap-1));
         programPrecision() = saved;
     }
+    // a subnormal result may be flushed to zero (FTZ, DAZ) : x * 1e-20 for x in [1e-18, 1] holds
+    // 0 in float, and so does its comparison to 0 ; in the corridors too
+    {
+        const int saved    = programPrecision();
+        programPrecision() = 1;
+        const interval x   = interval(1e-18, 1, -24);
+        const interval y   = A.Mul(x, A.FloatNum(1e-20));
+        check("witness : float x * 1e-20 may be a flushed zero", true, contains(y, 0.0));
+        check("witness : float x * 1e-20 > 0 may be false", true, contains(A.Gt(y, A.FloatNum(0)), 0.0));
+        const affine_algebra F10(10);
+        check("witness : a float corridor x * 1e-20 may be a flushed zero", true,
+              contains(toItv(F10.Mul(fromItv(x), F10.FloatNum(1e-20)), 10), 0.0));
+        check("witness : a float subnormal constant may be read as 0 (DAZ)", true,
+              contains(toItv(F10.FloatNum(1e-40), 10), 0.0));
+        // the flush is idempotent : a recursion adding a subnormal settles
+        AffItv r    = aempty();
+        bool   done = false;
+        for (int it = 1; !done && it <= 100; it++) {
+            AffItv f = F10.Add(F10.Mul(F10.Mem(r), F10.FloatNum(0.5)), F10.FloatNum(1e-40));
+            if (it > 8) f = awiden(r, f, 10);
+            done = !r.isEmpty() && aleq(f, r, 10);
+            r    = f;
+        }
+        check("witness : a recursion adding a float subnormal settles", true, done && contains(toItv(r, 10), 0.0));
+        programPrecision() = saved;
+    }
     return reportCheckResults();
 }
