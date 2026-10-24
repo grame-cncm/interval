@@ -20,7 +20,9 @@ for every possible execution of the program in its precision, under one executio
 
 - basic operations (+ − × /, sqrt, comparisons, conversions) round to nearest in the
   program's precision;
-- libm functions are within 2 ulps of the exact result;
+- libm functions are within 2 ulps of the exact result, the ulp of the exact result in
+  its binade (just above a power of two, 2 ulps reach 4 floats below it), and exact where
+  the C standard requires it (sin(±0) = ±0, log(1) = 0...);
 - the C++ compiler may contract a × b + c into an FMA.
 
 An interval contains every value any execution may produce. A guard is removed only when
@@ -272,14 +274,12 @@ integer operands before floating evaluation. Float zero and integral-valued
 floating functions retain a negative LSB, so later operations cannot wrap as int32.
 
 `*Bounds` provides a conservative mathematical reference, independently of the
-target libm. Public transcendental operations still add the existing two-ULP
-margin when `libmCompensation()` is enabled. Inclusion of **executed libm values**
-therefore requires a target whose result is at most two representable steps
-from the correctly rounded value, with the exact special values and function
-ranges used by the clamp. This is the precise contract of the historical
-`nextafter` margin; a published absolute error in ULPs must be translated into
-that contract, especially at binade boundaries. Arbitrary libms remain uncertified.
-Disabling the margin requires a correctly-rounded target. This distinction
+target libm. Public transcendental operations widen each bound of that reference by
+2 ulps of its binade when `libmCompensation()` is enabled, and the image of the
+function by the same margin (sin is at most 1 + 2 ulp(1)) ; a bound of exactly 0
+stays, by annex F of the C standard. Inclusion of **executed libm values** therefore
+requires a target libm within 2 ulps of the exact result, the error that libms
+publish. Disabling the margin requires a correctly-rounded target. This distinction
 applies equally to float and double. `mayBeInvalid` separately records possible
 NaN or undefined execution; NaN endpoints encode only numeric emptiness.
 Reciprocal and negative powers of merged signed zero use wider float/double
