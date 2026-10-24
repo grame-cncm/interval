@@ -76,8 +76,9 @@ int main()
     // is inexact. Exact significand comparisons must retain the neighbouring bit.
     check("double: positive inexact subnormal product is bracketed", true,
           algebra.Mul(interval(tiny, tiny, -1074), interval(0.75)) == interval(0, tiny));
+    // a negative product rounds to -tiny or to -0, never to +0
     check("double: negative inexact subnormal product is bracketed", true,
-          algebra.Mul(interval(-tiny, -tiny, -1074), interval(0.75)) == interval(-tiny, 0));
+          algebra.Mul(interval(-tiny, -tiny, -1074), interval(0.75)) == interval(-tiny, -0.0));
     // an exact subnormal result, or the zero a flush to zero makes of it (FTZ, DAZ)
     check("double: an exact subnormal product is itself or a flushed zero", true,
           algebra.Mul(interval(2 * tiny, 2 * tiny, -1074), interval(0.5)) == interval(0, tiny));

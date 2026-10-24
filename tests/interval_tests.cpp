@@ -266,8 +266,9 @@ int main()
                    interval(-HUGE_VAL, -HUGE_VAL, -24));
         checkExact("single: log10 of underflowed zero", algebra.Log10(underflowed),
                    interval(-HUGE_VAL, -HUGE_VAL, -24));
+        // a positive value underflows to +0 : its reciprocal is +inf
         checkExact("single: reciprocal of underflowed zero", algebra.Inv(underflowed),
-                   interval(-HUGE_VAL, HUGE_VAL, -24));
+                   interval(HUGE_VAL, HUGE_VAL, -24));
         checkExact("single: sqrt of underflowed zero retains floating nature",
                    algebra.Sqrt(underflowed), interval(0, 0, -24));
         // Check both signs and the transition from a subnormal result to zero.

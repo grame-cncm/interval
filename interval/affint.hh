@@ -162,8 +162,8 @@ inline AffItv fromItv(const interval& x)
 inline interval toItv(const AffItv& x, double T)
 {
     if (x.isEmpty()) return empty(x.lsb).withInvalid(x.mayBeInvalid).withOverflow(x.mayOverflow);
-    const double lo = std::min(x.lo(0), x.lo(T));
-    const double hi = std::max(x.hi(0), x.hi(T));
+    const double lo = minTotal(x.lo(0), x.lo(T));
+    const double hi = maxTotal(x.hi(0), x.hi(T));
     if (x.lsb >= 0 && (hi > 2147483647.0 || lo < -2147483648.0)) {
         return interval(-2147483648.0, 2147483647.0, x.lsb, x.mayBeInvalid)
             .withOverflow(x.mayOverflow);
@@ -207,7 +207,7 @@ inline AffItv flushedToZero(AffItv r, double T)
         r.a0 = (r.a1 == 0) ? 0.0 : detail::directedBinary(detail::BinaryOp::Sub, r.a0, lo, detail::Direction::Down);
     }
     if (hi < 0 && hi > -m) {
-        r.b0 = (r.b1 == 0) ? 0.0 : detail::directedBinary(detail::BinaryOp::Sub, r.b0, hi, detail::Direction::Up);
+        r.b0 = (r.b1 == 0) ? -0.0 : detail::directedBinary(detail::BinaryOp::Sub, r.b0, hi, detail::Direction::Up);
     }
     return r;
 }

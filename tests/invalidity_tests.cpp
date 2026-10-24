@@ -214,8 +214,10 @@ void domainTests(int precision)
     check(p + "infinity over infinity is invalid", true, a.Div(inf, inf).mayBeInvalid());
     check(p + "nonzero over zero is infinite but not NaN", false, a.Div(one, zero).mayBeInvalid());
     check(p + "reciprocal zero is infinite but not NaN", false, a.Inv(zero).mayBeInvalid());
-    check(p + "merged signed zero includes both reciprocal infinities", true,
-          a.Inv(zero).has(-HUGE_VAL) && a.Inv(zero).has(HUGE_VAL));
+    // the zeros keep their signs : 1/+0 = +inf ; [-0, +0] holds both zeros and both infinities
+    check(p + "the reciprocal of +0 is +inf", true, a.Inv(zero).is(HUGE_VAL));
+    check(p + "both signed zeros include both reciprocal infinities", true,
+          a.Inv(interval(-0.0, 0.0, -24)).has(-HUGE_VAL) && a.Inv(interval(-0.0, 0.0, -24)).has(HUGE_VAL));
     for (Binary method : {static_cast<Binary>(&interval_algebra::Mod), &interval_algebra::Fmod,
                           &interval_algebra::Remainder}) {
         check(p + "remainder with zero divisor is invalid", true, (a.*method)(one, zero).mayBeInvalid());
