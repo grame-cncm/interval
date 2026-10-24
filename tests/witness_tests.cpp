@@ -9,6 +9,7 @@
 #include "interval/affine_ops.hh"
 #include "interval/affint.hh"
 #include "interval/check.hh"
+#include "interval/double_double.hh"
 #include "interval/interval_algebra.hh"
 #include "interval/interval_def.hh"
 
@@ -236,6 +237,23 @@ int main()
         const affine_algebra F10(10);
         const AffItv         w = F10.WRTbl(F10.IntNum(100), F10.Gen(AffItv{0, 0, 0, 1, -24}), F10.IntNum(0), F10.FloatNum(0));
         check("witness : rdtable(100, g = t, 99) holds 99", true, contains(toItv(F10.RDTbl(w, F10.IntNum(99)), 10), 99.0));
+    }
+    // double-double at its edges : the rounding to float reads lo, an overflow is an infinity,
+    // an intermediate overflow is computed again, a zero keeps its sign, a subnormal product
+    // is the correctly rounded plain product
+    {
+        const double DMAX = 0x1.fffffffffffffp+1023;
+        check("witness : ddToFloat(16777217 + 1e-10) is 16777218", true,
+              ddToFloat(ddAdd({16777217, 0}, {1e-10, 0})) == 16777218.0f);
+        check("witness : ddToFloat(16777217 - 1e-10) is 16777216", true,
+              ddToFloat(ddAdd({16777217, 0}, {-1e-10, 0})) == 16777216.0f);
+        check("witness : ddMul(DBL_MAX, 1 + 2^-53) overflows", true, std::isinf(ddMul({DMAX, 0}, {1, 0x1p-53}).hi));
+        check("witness : ddAdd(DBL_MAX, 2^970 - 2^960) is DBL_MAX", true, ddAdd({DMAX, 0}, {0x1p970, -0x1p960}).hi == DMAX);
+        check("witness : ddAdd(-0, -0) is -0", true, std::signbit(ddAdd({-0.0, 0}, {-0.0, 0}).hi));
+        check("witness : ddMul(-1, 0) is -0", true, std::signbit(ddMul({-1, 0}, {0, 0}).hi));
+        check("witness : ddDiv(-0, 1) is -0", true, std::signbit(ddDiv({-0.0, 0}, {1, 0}).hi));
+        check("witness : a subnormal ddMul is the rounded product", true,
+              ddMul({0x1.352c06d3f408bp-512, 0}, {0x1.18938fc7c6d0ap-508, 0}).hi == 0x1.52da5d649bc45p-1020);
     }
     return reportCheckResults();
 }
