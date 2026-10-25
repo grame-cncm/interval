@@ -373,5 +373,13 @@ int main()
         }
         check("witness : the sum of a ramp stays >= 0", true, done && y.lo(0) >= 0 && y.lo(T48) >= 0);
     }
+    // a product by a power of two is exact where its values stay normal : no rounding margin
+    {
+        const AffItv c{1, 0.25, 2, 0.5, -24};
+        const AffItv h = F.Mul(c, F.FloatNum(0.5));
+        const AffItv q = F.Div(c, F.FloatNum(4.0));
+        check("witness : a corridor times 0.5 is exactly halved", true, h.a0 == 0.5 && h.a1 == 0.125 && h.b0 == 1 && h.b1 == 0.25);
+        check("witness : a corridor over 4 is exactly quartered", true, q.a0 == 0.25 && q.a1 == 0.0625 && q.b0 == 0.5 && q.b1 == 0.125);
+    }
     return reportCheckResults();
 }
