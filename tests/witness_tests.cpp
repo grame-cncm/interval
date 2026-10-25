@@ -397,5 +397,22 @@ int main()
         check("witness : a bpf of a moving input moves", true, A.Bpf(c, {k}, {k, A.FloatNum(2)}).moves());
         check("witness : an operation on intervals that do not move does not move", false, A.Add(k, A.Mix(k, k, k)).moves());
     }
+    // a flushed corridor holds the flushed values at every sample time : the lower line
+    // 2^-1023 - 2^-1024 t (T = 2) is the subnormal 2^-1024 at t = 1, read as 0 ; the flush is
+    // idempotent, and a corridor of ordinary values is left as it is
+    {
+        const double   m  = 0x1p-1022;
+        const AffItv   X  = flushedToZero(AffItv{0x1p-1023, -0x1p-1024, 1, 0, -24}, 2);
+        const AffItv   X2 = flushedToZero(X, 2);
+        const AffItv   c{0.5, -0.25, 1, 0.5, -24};
+        const AffItv   fc = flushedToZero(c, 2);
+        check("witness : a flushed lower line holds 0 where it was subnormal", true, X.lo(1) <= 0);
+        check("witness : the flush of a corridor is idempotent", true, X2.a0 == X.a0 && X2.a1 == X.a1 && X2.b0 == X.b0 && X2.b1 == X.b1);
+        check("witness : the flush leaves an ordinary corridor as it is", true, fc.a0 == c.a0 && fc.a1 == c.a1 && fc.b0 == c.b0 && fc.b1 == c.b1);
+        // the upper line from -m to +0 (T = 2), times 1/4 : the chord ends at +0, not -0
+        const affine_algebra F2(2);
+        const AffItv         R = F2.Mul(AffItv{-1, 0, -m, m / 2, -24}, F2.FloatNum(0.25));
+        check("witness : a product that reaches +0 holds +0", true, leTotal(0.0, R.hi(2)));
+    }
     return reportCheckResults();
 }
