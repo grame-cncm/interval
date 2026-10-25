@@ -319,5 +319,28 @@ int main()
         check("witness : the image of a probe seed is within it over [0, T]", true, aleqWithin(image, seed, 5));
         check("witness : the image of a probe seed holds the program past T", true, contains(forever(image, 5), -10.0));
     }
+    // a bound of infinite intercept has one writing : the sum of a ramp, y = y' + t, settles
+    {
+        const double         T48 = 48000;
+        const affine_algebra F48(T48);
+        AffItv               y    = aempty();
+        bool                 done = false;
+        for (int it = 1; !done && it <= 100; it++) {
+            AffItv f = F48.Add(F48.Mem(y), AffItv{0, 1, 0, 1, -24});
+            if (it > 8) f = awiden(y, f, T48);
+            done = !y.isEmpty() && aleq(f, y, T48);
+            y    = f;
+        }
+        check("witness : the sum of a ramp settles", true, done);
+    }
+    // a constant -0.0 is -0 : 1 / -0 = -inf
+    check("witness : the reciprocal of the constant -0.0 is -inf", true, A.Inv(A.FloatNum(-0.0)).is(-HUGE_VAL));
+    // an interval built outside the algebra enters the corridors flushed
+    {
+        const int saved    = programPrecision();
+        programPrecision() = 1;
+        check("witness : fromItv flushes a subnormal bound", true, contains(toItv(fromItv(interval(1e-40, 1, -24)), 10), 0.0));
+        programPrecision() = saved;
+    }
     return reportCheckResults();
 }

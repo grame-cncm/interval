@@ -93,11 +93,31 @@ int main()
         {"floor", [](double x) { return std::floor(x); }, &interval_algebra::Floor, &affine_algebra::Floor},
         {"rint", [](double x) { return std::rint(x); }, &interval_algebra::Rint, &affine_algebra::Rint},
         {"round", [](double x) { return std::round(x); }, &interval_algebra::Round, &affine_algebra::Round},
+        {"exp", [](double x) { return std::exp(x); }, &interval_algebra::Exp, &affine_algebra::Exp},
+        {"log", [](double x) { return std::log(x); }, &interval_algebra::Log, &affine_algebra::Log},
+        {"log10", [](double x) { return std::log10(x); }, &interval_algebra::Log10, &affine_algebra::Log10},
+        {"sin", [](double x) { return std::sin(x); }, &interval_algebra::Sin, &affine_algebra::Sin},
+        {"cos", [](double x) { return std::cos(x); }, &interval_algebra::Cos, &affine_algebra::Cos},
+        {"tan", [](double x) { return std::tan(x); }, &interval_algebra::Tan, &affine_algebra::Tan},
+        {"asin", [](double x) { return std::asin(x); }, &interval_algebra::Asin, &affine_algebra::Asin},
+        {"acos", [](double x) { return std::acos(x); }, &interval_algebra::Acos, &affine_algebra::Acos},
+        {"atan", [](double x) { return std::atan(x); }, &interval_algebra::Atan, &affine_algebra::Atan},
+        {"sinh", [](double x) { return std::sinh(x); }, &interval_algebra::Sinh, &affine_algebra::Sinh},
+        {"cosh", [](double x) { return std::cosh(x); }, &interval_algebra::Cosh, &affine_algebra::Cosh},
+        {"tanh", [](double x) { return std::tanh(x); }, &interval_algebra::Tanh, &affine_algebra::Tanh},
+        {"asinh", [](double x) { return std::asinh(x); }, &interval_algebra::Asinh, &affine_algebra::Asinh},
+        {"acosh", [](double x) { return std::acosh(x); }, &interval_algebra::Acosh, &affine_algebra::Acosh},
+        {"atanh", [](double x) { return std::atanh(x); }, &interval_algebra::Atanh, &affine_algebra::Atanh},
     };
     const std::vector<Binary> binary = {
         {"add", add, &interval_algebra::Add, &affine_algebra::Add}, {"sub", sub, &interval_algebra::Sub, &affine_algebra::Sub},
         {"mul", mul, &interval_algebra::Mul, &affine_algebra::Mul}, {"div", dvd, &interval_algebra::Div, &affine_algebra::Div},
         {"min", mn, &interval_algebra::Min, &affine_algebra::Min},  {"max", mx, &interval_algebra::Max, &affine_algebra::Max},
+        {"pow", [](double x, double y) { return std::pow(x, y); }, &interval_algebra::Pow, &affine_algebra::Pow},
+        {"fmod", [](double x, double y) { return std::fmod(x, y); }, &interval_algebra::Fmod, &affine_algebra::Fmod},
+        {"mod", [](double x, double y) { return std::fmod(x, y); }, &interval_algebra::Mod, &affine_algebra::Mod},
+        {"remainder", [](double x, double y) { return std::remainder(x, y); }, &interval_algebra::Remainder, &affine_algebra::Remainder},
+        {"atan2", [](double x, double y) { return std::atan2(x, y); }, &interval_algebra::Atan2, &affine_algebra::Atan2},
     };
 
     std::mt19937 rng(20261024);
