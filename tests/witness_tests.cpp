@@ -342,5 +342,36 @@ int main()
         check("witness : fromItv flushes a subnormal bound", true, contains(toItv(fromItv(interval(1e-40, 1, -24)), 10), 0.0));
         programPrecision() = saved;
     }
+    // a corridor times the constant 1 is that corridor ; y = y' * 1.0 + 0.1 settles as y' + 0.1
+    {
+        const AffItv c{-1, 0.25, 2, 0.5, -24};
+        const AffItv p = F.Mul(c, F.FloatNum(1.0));
+        check("witness : a corridor times 1.0 is itself", true, p.a0 == c.a0 && p.a1 == c.a1 && p.b0 == c.b0 && p.b1 == c.b1);
+        const double         T20 = 1048576;
+        const affine_algebra F20(T20);
+        AffItv               y    = aempty();
+        bool                 done = false;
+        for (int it = 1; !done && it <= 100; it++) {
+            AffItv f = F20.Add(F20.Mul(F20.Mem(y), F20.FloatNum(1.0)), F20.FloatNum(0.1));
+            if (it > 8) f = awiden(y, f, T20);
+            done = !y.isEmpty() && aleq(f, y, T20);
+            y    = f;
+        }
+        check("witness : y = y' * 1.0 + 0.1 settles on a finite corridor", true, done && std::isfinite(y.b0));
+    }
+    // an accumulator of positive values stays positive : y = y' + t (double) keeps y >= 0
+    {
+        const double         T48 = 48000;
+        const affine_algebra F48(T48);
+        AffItv               y    = aempty();
+        bool                 done = false;
+        for (int it = 1; !done && it <= 100; it++) {
+            AffItv f = F48.Add(F48.Mem(y), AffItv{0, 1, 0, 1, -24});
+            if (it > 8) f = awiden(y, f, T48);
+            done = !y.isEmpty() && aleq(f, y, T48);
+            y    = f;
+        }
+        check("witness : the sum of a ramp stays >= 0", true, done && y.lo(0) >= 0 && y.lo(T48) >= 0);
+    }
     return reportCheckResults();
 }
