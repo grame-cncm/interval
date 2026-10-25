@@ -403,6 +403,10 @@ int main()
         const interval x = hullWithMotion(AffItv{10, -1, 10, -1, -24}, 5);
         check("witness : sqrt of a falling interval may be invalid past T", true, A.Sqrt(x).mayBeInvalid());
         check("witness : log of a falling interval may be invalid past T", true, A.Log(x).mayBeInvalid());
+        // t/10 - 1 over T = 5 is [-1, -0.5], rising past T : sqrt is empty over the horizon,
+        // and 1 at t = 20
+        const interval u = hullWithMotion(AffItv{-1, 0.1, -1, 0.1, -24}, 5);
+        check("witness : sqrt of a rising negative interval holds its values past T", true, contains(A.Sqrt(u), 1.0));
     }
     // a line that reaches 0 by an exact cancellation bounds either zero : y = -(t - T) is -0 at
     // t = T, and 1 / y is -inf there
