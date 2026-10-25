@@ -381,21 +381,36 @@ int main()
         check("witness : a corridor times 0.5 is exactly halved", true, h.a0 == 0.5 && h.a1 == 0.125 && h.b0 == 1 && h.b1 == 0.25);
         check("witness : a corridor over 4 is exactly quartered", true, q.a0 == 0.25 && q.a1 == 0.0625 && q.b0 == 0.5 && q.b1 == 0.125);
     }
-    // an operation on a moving interval gives a moving result : c = t is [0, 10] over the
-    // horizon T = 10, its upper bound rising past it ; c + 1 is 21 at t = 20
+    // an operation on a moving interval gives a moving result where the operation on its
+    // values for all time passes it : c = t is [0, 10] over the horizon T = 10, its upper
+    // bound rising past it ; c + 1 is 21 at t = 20, sin(c) stays within [-1, 1]
     {
         const interval c = hullWithMotion(AffItv{0, 0, 0, 1, -24}, 10);
         const interval k = A.FloatNum(0.5);
-        check("witness : a moving interval plus 1 moves", true, A.Add(c, A.FloatNum(1)).hiMoves());
-        check("witness : the negation of a rising bound falls", true, A.Neg(c).loMoves());
-        check("witness : sin of a moving interval moves", true, A.Sin(c).moves());
+        const interval s = A.Add(c, A.FloatNum(1));
+        check("witness : a moving interval plus 1 moves up", true, s.hiMoves() && !s.loMoves());
+        check("witness : the negation of a rising bound falls", true, A.Neg(c).loMoves() && !A.Neg(c).hiMoves());
+        check("witness : sin of a moving interval holds [-1, 1] for all time", false, A.Sin(c).moves());
+        check("witness : tanh of a rising interval moves up only", true, A.Tanh(c).hiMoves() && !A.Tanh(c).loMoves());
         check("witness : a mix with a moving operand moves", true, A.Mix(k, c, k).moves());
         check("witness : an IRM of a moving input moves", true, A.Irm(c, k).moves());
         check("witness : a sum with a moving term moves", true, A.Sum({k, c}).moves());
         check("witness : a FIR of a moving input moves", true, A.Fir(c, {k, k}).moves());
         check("witness : an IIR of a moving input moves", true, A.Iir(c, {k}).moves());
-        check("witness : a bpf of a moving input moves", true, A.Bpf(c, {k}, {k, A.FloatNum(2)}).moves());
+        check("witness : a bpf whose input reaches a region past T moves", true, A.Bpf(c, {A.FloatNum(20)}, {k, A.FloatNum(2)}).hiMoves());
         check("witness : an operation on intervals that do not move does not move", false, A.Add(k, A.Mix(k, k, k)).moves());
+        // x = 10 - t over T = 5 is [5, 10], falling past T : sqrt(x) is NaN at t = 11
+        const interval x = hullWithMotion(AffItv{10, -1, 10, -1, -24}, 5);
+        check("witness : sqrt of a falling interval may be invalid past T", true, A.Sqrt(x).mayBeInvalid());
+        check("witness : log of a falling interval may be invalid past T", true, A.Log(x).mayBeInvalid());
+    }
+    // a line that reaches 0 by an exact cancellation bounds either zero : y = -(t - T) is -0 at
+    // t = T, and 1 / y is -inf there
+    {
+        const affine_algebra F1k(1024);
+        const AffItv         y = F1k.Neg(F1k.Sub(AffItv{0, 1, 0, 1, -24}, F1k.FloatNum(1024)));
+        check("witness : -(t - T) holds -0 at t = T", true, leTotal(y.lo(1024), -0.0));
+        check("witness : 1 / -(t - T) holds -inf", true, contains(toItv(F1k.Inv(y), 1024), -HUGE_VAL));
     }
     // a flushed corridor holds the flushed values at every sample time : the lower line
     // 2^-1023 - 2^-1024 t (T = 2) is the subnormal 2^-1024 at t = 1, read as 0 ; the flush is
