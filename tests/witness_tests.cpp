@@ -381,5 +381,21 @@ int main()
         check("witness : a corridor times 0.5 is exactly halved", true, h.a0 == 0.5 && h.a1 == 0.125 && h.b0 == 1 && h.b1 == 0.25);
         check("witness : a corridor over 4 is exactly quartered", true, q.a0 == 0.25 && q.a1 == 0.0625 && q.b0 == 0.5 && q.b1 == 0.125);
     }
+    // an operation on a moving interval gives a moving result : c = t is [0, 10] over the
+    // horizon T = 10, its upper bound rising past it ; c + 1 is 21 at t = 20
+    {
+        const interval c = hullWithMotion(AffItv{0, 0, 0, 1, -24}, 10);
+        const interval k = A.FloatNum(0.5);
+        check("witness : a moving interval plus 1 moves", true, A.Add(c, A.FloatNum(1)).hiMoves());
+        check("witness : the negation of a rising bound falls", true, A.Neg(c).loMoves());
+        check("witness : sin of a moving interval moves", true, A.Sin(c).moves());
+        check("witness : a mix with a moving operand moves", true, A.Mix(k, c, k).moves());
+        check("witness : an IRM of a moving input moves", true, A.Irm(c, k).moves());
+        check("witness : a sum with a moving term moves", true, A.Sum({k, c}).moves());
+        check("witness : a FIR of a moving input moves", true, A.Fir(c, {k, k}).moves());
+        check("witness : an IIR of a moving input moves", true, A.Iir(c, {k}).moves());
+        check("witness : a bpf of a moving input moves", true, A.Bpf(c, {k}, {k, A.FloatNum(2)}).moves());
+        check("witness : an operation on intervals that do not move does not move", false, A.Add(k, A.Mix(k, k, k)).moves());
+    }
     return reportCheckResults();
 }
