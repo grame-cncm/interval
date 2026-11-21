@@ -1,3 +1,18 @@
+/* Copyright 2020-2026 Yann Orlarey, Agathe Herrou, Stéphane Letz
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "interval_algebra.hh"
 #include "interval_def.hh"
 
@@ -77,7 +92,9 @@ interval interval_algebra::numericLowest(const interval& x) const
 }
 interval interval_algebra::numericBitCast(const interval& x) const
 {
-    return x.isEmpty() ? empty() : interval(-2147483648.0, 2147483647.0, 0);
+    // the integer of the IEEE-754 encoding of x, unrelated to its value (0.5f is 0x3F000000) :
+    // any integer of the width, int64 for a double (#1371), which covers int32
+    return x.isEmpty() ? empty() : interval(-9223372036854775808.0, 9223372036854775807.0, 0);
 }
 interval interval_algebra::numericSelect2(const interval& x, const interval& y, const interval& z) const
 {
