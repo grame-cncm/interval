@@ -112,6 +112,16 @@ widening affine conserve les alertes anciennes et nouvelles. Les deux ponts
 `fromItv` et `toItv` préservent le flag, y compris pour les états uniquement
 invalides et les corridors entiers normalisés après wrapping.
 
+Le `min` et le `max` suivent par défaut la règle commune : l’alerte d’un opérande
+atteint le résultat. Lorsqu’un opérande peut être NaN, l’encadrement contient en
+outre toutes les valeurs de l’autre, que certaines cibles renvoient. Lorsque la
+cible calcule maximumNumber et minimumNumber d’IEEE 754-2019 (`minMaxNumber()`),
+un opérande réel NaN donne l’autre : le résultat n’est invalide que si les deux
+opérandes peuvent l’être. L’alerte d’un opérande entier n’est pas un NaN et
+atteint toujours le résultat. Ce réglage suppose que la cible rend définies, ou
+refuse, ses opérations indéfinies là où elles se produisent : l’alerte d’un réel
+est alors la possibilité d’un NaN.
+
 Les sélecteurs, contrôles, effets, paramètres d’interface et échantillons d’une
 waveform propagent leurs alertes. Une assertion de bornes ne certifie pas
 silencieusement des valeurs exclues. Les fonctions étrangères sans contrat
@@ -132,6 +142,9 @@ La cible C++17 `InvalidityTests` couvre notamment :
   admissibles après troncature, les valeurs float voisines et les conversions
   successives entier → float → entier.
 - Les restes entiers interdits, les comptes de décalage et le wrapping valide.
+- Le `min` et le `max` sous les deux réglages de `minMaxNumber()`, ordinaires et
+  affines : un opérande seulement NaN, deux opérandes NaN possibles, les
+  alertes entières des témoins 13 et 14.
 - Les changements de flag sans changement de bornes, réunions, raffinements,
   widening et ponts affines.
 - Les opérandes des contrôles et des interfaces, y compris les paramètres par

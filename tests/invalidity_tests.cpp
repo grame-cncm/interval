@@ -503,6 +503,64 @@ void integrationCompositionTests(int precision)
     }
 }
 
+// Under maximumNumber and minimumNumber (minMaxNumber()), a NaN real operand of a min or a
+// max gives the other one : the result is invalid only when both operands may be, or when
+// an integer operand may be. The default keeps the alert of either operand.
+void minMaxNumberTests(int precision)
+{
+    programPrecision() = precision;
+    const interval_algebra a;
+    const affine_algebra affine(32);
+    const std::string p = precision == 1 ? "float maximumNumber: " : "double maximumNumber: ";
+    const interval maybeNaN(-1, 4, -24, true);
+    const interval onlyNaN = a.FloatNum(NAN);
+    const AffItv amaybeNaN = fromItv(maybeNaN), aonlyNaN = fromItv(onlyNaN);
+
+    minMaxNumber() = true;
+    const interval bounded = a.Max(a.FloatNum(3), a.Min(a.FloatNum(20000), maybeNaN));
+    const interval abounded = toItv(affine.Max(affine.FloatNum(3), affine.Min(affine.FloatNum(20000), amaybeNaN)), 32);
+    check(p + "a bound of a possible NaN is valid and holds the bound", true,
+          bounded.isValid() && bounded.lo() == 3 && bounded.hi() == 20000 &&
+          abounded.isValid() && abounded.lo() == 3 && abounded.hi() == 20000);
+    check(p + "its integer conversion is defined", true,
+          a.IntCast(bounded).isValid() && !affine.IntCast(fromItv(abounded)).mayBeInvalid);
+    const interval only = a.Max(a.FloatNum(-1), onlyNaN);
+    const interval aonly = toItv(affine.Max(affine.FloatNum(-1), aonlyNaN), 32);
+    check(p + "the max of a value and a NaN is the value", true,
+          only.isValid() && only.lo() == -1 && only.hi() == -1 &&
+          aonly.isValid() && aonly.lo() == -1 && aonly.hi() == -1);
+    check(p + "two possible NaN stay invalid", true,
+          a.Max(maybeNaN, maybeNaN).mayBeInvalid() && a.Min(onlyNaN, maybeNaN).mayBeInvalid() &&
+          affine.Max(amaybeNaN, amaybeNaN).mayBeInvalid && affine.Min(aonlyNaN, amaybeNaN).mayBeInvalid);
+    const interval product = a.Mul(a.FloatNum(1e-48), a.FloatNum(HUGE_VAL));
+    const interval kaiser = a.Min(a.FloatNum(1), a.Max(a.FloatNum(-1), product));
+    check(p + "the bounded product of the window_kaiser observation is valid", true,
+          kaiser.isValid() && kaiser.lo() >= -1 && kaiser.hi() <= 1);
+    // an integer alert is no NaN : witnesses 13 and 14 keep theirs. The result of a real
+    // bound is real : its alert is then read as a NaN, which the premise of minMaxNumber()
+    // makes true (an undefined conversion is made defined where it happens)
+    const interval period = a.Div(a.FloatNum(192000), a.Mul(a.FloatNum(440), interval(1.19e-7, 10, -24)));
+    const interval cast = a.IntCast(period);
+    check(p + "13 an invalid conversion survives a bound by integers", true,
+          a.Min(a.IntNum(4096), a.Max(a.IntNum(0), cast)).mayBeInvalid() &&
+          affine.Min(affine.IntNum(4096), affine.Max(affine.IntNum(0), fromItv(cast))).mayBeInvalid);
+    check(p + "13 an invalid conversion survives a real bound", true,
+          a.Max(a.FloatNum(0), cast).mayBeInvalid() && affine.Max(affine.FloatNum(0), fromItv(cast)).mayBeInvalid);
+    const interval left = a.Lsh(a.IntNum(-1), a.ARsh(a.IntNum(-1), a.IntNum(2)));
+    check(p + "14 an invalid shift survives a bound by integers", true,
+          a.Min(a.IntNum(1), a.Max(a.IntNum(0), left)).mayBeInvalid() &&
+          affine.Min(affine.IntNum(1), affine.Max(affine.IntNum(0), fromItv(left))).mayBeInvalid);
+
+    minMaxNumber() = false;
+    check(p + "by default a possible NaN operand makes the result invalid", true,
+          a.Max(a.FloatNum(3), maybeNaN).mayBeInvalid() &&
+          affine.Max(affine.FloatNum(3), amaybeNaN).mayBeInvalid);
+    const interval dflt = a.Max(a.FloatNum(-1), onlyNaN);
+    const interval adflt = toItv(affine.Max(affine.FloatNum(-1), aonlyNaN), 32);
+    check(p + "by default the max of a value and a NaN holds the value, invalid", true,
+          dflt.mayBeInvalid() && dflt.has(-1) && adflt.mayBeInvalid() && adflt.has(-1));
+}
+
 // Independent runtime witnesses use libm solely to observe NaN creation; the
 // test does not assume that libm gives correctly rounded finite results.
 void nanWitnessTests(int precision)
@@ -676,6 +734,7 @@ int main()
         conversionTests(precision);
         structuralTests(precision);
         integrationCompositionTests(precision);
+        minMaxNumberTests(precision);
         nanWitnessTests(precision);
 #ifdef INTERVAL_INVALIDITY_MPFR_ORACLE
         mpfrDomainTests(precision);
